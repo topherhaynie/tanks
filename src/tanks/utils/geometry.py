@@ -80,31 +80,46 @@ def line_circle_intersection(
         Tuple of (collides, closest_point) where closest_point is (x, y) or None
 
     """
-    # Vector from line start to circle center
+    # Vector from line start to line end
     dx = x2 - x1
     dy = y2 - y1
+
+    # Vector from line start to circle center
     fx = x1 - cx
     fy = y1 - cy
 
-    # Quadratic formula coefficients
+    # Quadratic formula coefficients for ray-circle intersection
     a = dx * dx + dy * dy
+
+    # Handle degenerate case (zero-length line segment)
+    if a < EPSILON:
+        dist_sq = fx * fx + fy * fy
+        if dist_sq <= radius * radius:
+            return True, (x1, y1)
+        return False, None
+
     b = 2 * (fx * dx + fy * dy)
     c = (fx * fx + fy * fy) - radius * radius
 
     discriminant = b * b - 4 * a * c
 
+    # No intersection
     if discriminant < 0:
         return False, None
 
-    # Calculate intersection points
+    # Calculate intersection parameters
     discriminant = math.sqrt(discriminant)
     t1 = (-b - discriminant) / (2 * a)
     t2 = (-b + discriminant) / (2 * a)
 
-    # Check if intersection is within line segment
-    if (0 <= t1 <= 1) or (0 <= t2 <= 1):
-        t = min(t1, t2) if t1 >= 0 else t2
-        t = max(0, min(1, t))
+    # Use the closest intersection point that's within the line segment
+    t = None
+    if 0 <= t1 <= 1:
+        t = t1
+    elif 0 <= t2 <= 1:
+        t = t2
+
+    if t is not None:
         closest_x = x1 + t * dx
         closest_y = y1 + t * dy
         return True, (closest_x, closest_y)

@@ -1,31 +1,44 @@
 """The main entry point for the tanks game."""
 
-from tanks.core import Game
-from tanks.input import KeyboardController
+import pygame
+
+from tanks.demo import run_demo
+
+
+def print_menu() -> None:
+    """Print the game mode selection menu."""
+    print("=" * 50)  # noqa: T201
+    print("TANK BATTLE - Phase 1")  # noqa: T201
+    print("=" * 50)  # noqa: T201
+    print()  # noqa: T201
+    print("Select Game Mode:")  # noqa: T201
+    print("  1. Two-Player Demo")  # noqa: T201
+    print("  q. Quit")  # noqa: T201
+    print()  # noqa: T201
 
 
 def main() -> None:
-    """Run the tank battle game."""
-    # Create game
-    game = Game()
+    """Run the tank battle game with mode selection."""
+    try:
+        while True:
+            print_menu()
+            choice = input("Enter your choice: ").strip().lower()
+            print()  # noqa: T201
 
-    # Load map
-    game.load_map()  # Uses default simple arena
-
-    # Spawn player tank
-    player_tank = game.spawn_tank(0)
-
-    # Add keyboard controller
-    if player_tank:
-        controller = KeyboardController(player_tank, game)
-        game.add_input_handler(controller)
-
-    # Run game
-    print("Tank Battle - Phase 1")  # noqa: T201
-    print("Controls: WASD to move, Mouse to aim, Space to shoot")  # noqa: T201
-    print("Press ESC to quit, F1 to toggle debug, P to pause")  # noqa: T201
-
-    game.run()
+            if choice == "1":
+                should_quit = run_demo()
+                if should_quit:
+                    print("\nThanks for playing!")  # noqa: T201
+                    break
+                print("\nReturning to menu...\n")  # noqa: T201
+            elif choice == "q":
+                print("Thanks for playing!")  # noqa: T201
+                break
+            else:
+                print(f"Invalid choice: '{choice}'. Please try again.\n")  # noqa: T201
+    finally:
+        # Clean up pygame on exit
+        pygame.quit()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
+from tanks.effects.visual import MuzzleFlash, VisualEffect
+
 if TYPE_CHECKING:
     from tanks.entities.tank import Tank
     from tanks.maps.map import Map
@@ -61,6 +63,9 @@ class Renderer:
         # Layer 2: Entities
         self.render_bullets(game_state.bullets)
         self.render_tanks(game_state.tanks)
+
+        # Layer 2.5: Visual effects
+        self.render_effects(game_state.effects)
 
         # Layer 3: Debug overlays
         if self.settings.show_hitboxes:
@@ -164,6 +169,37 @@ class Renderer:
                 continue
 
             pygame.draw.circle(self.screen, COLOR_BULLET, (int(bullet.x), int(bullet.y)), bullet.radius)
+
+    def render_effects(self, effects: list[VisualEffect]) -> None:
+        """Render visual effects.
+
+        Args:
+            effects: List of visual effects to render.
+
+        """
+        for effect in effects:
+            if not effect.active:
+                continue
+
+            if isinstance(effect, MuzzleFlash):
+                self.render_muzzle_flash(effect)
+
+    def render_muzzle_flash(self, flash: MuzzleFlash) -> None:
+        """Render a muzzle flash effect.
+
+        Args:
+            flash: Muzzle flash effect to render.
+
+        """
+        points = flash.get_flash_points()
+        min_points_for_polygon = 3
+        if len(points) >= min_points_for_polygon:
+            # Get alpha-adjusted color
+            alpha = flash.get_alpha()
+            color = tuple(int(c * alpha) for c in flash.color)
+
+            # Draw the star shape
+            pygame.draw.polygon(self.screen, color, points)
 
     def render_hp_bar(self, tank: "Tank") -> None:
         """Render health bar above tank.

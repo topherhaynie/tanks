@@ -5,7 +5,9 @@ WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
 WINDOW_TITLE = "Tank Battle"
 FPS = 60
-TICKS_PER_SECOND = 30  # Fixed physics timestep
+TICKS_PER_SECOND = 30  # Fixed physics timestep (for backward compatibility)
+PHYSICS_RATE = 120  # Physics updates per second (high for accuracy)
+INPUT_RATE = 30  # Input sampling rate (for determinism)
 
 # Tile System
 TILE_SIZE = 64  # pixels

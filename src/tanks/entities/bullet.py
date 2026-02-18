@@ -19,8 +19,17 @@ class Bullet(Entity):
         self.lifetime = BULLET_LIFETIME
         self.bounces = 0
 
+        # Track previous position for swept collision detection
+        self.prev_x = x
+        self.prev_y = y
+
     def update(self, dt):
         """Update bullet position and lifetime."""
+        # Store previous position
+        self.prev_x = self.x
+        self.prev_y = self.y
+
+        # Update position
         self.x += self.vx * dt
         self.y += self.vy * dt
         self.lifetime -= dt

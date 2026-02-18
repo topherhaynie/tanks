@@ -6,14 +6,27 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from tanks.config.constants import FPS, TICKS_PER_SECOND, WINDOW_HEIGHT, WINDOW_TITLE, WINDOW_WIDTH
+from tanks.config.constants import (
+    FPS,
+    INPUT_RATE,
+    PHYSICS_RATE,
+    WINDOW_HEIGHT,
+    WINDOW_TITLE,
+    WINDOW_WIDTH,
+)
 from tanks.config.settings import Settings
 from tanks.core.clock import FixedClock
 from tanks.core.events import EventSystem
+from tanks.effects.visual import MuzzleFlash, VisualEffect
 from tanks.entities import Bullet, Tank
 from tanks.maps import MapLoader
 from tanks.physics import CollisionSystem, MovementSystem, ProjectileSystem
 from tanks.rendering import Renderer
+
+try:
+    from tanks.audio import SoundManager
+except ImportError:
+    SoundManager = None  # type: ignore[misc, assignment]
 
 if TYPE_CHECKING:
     from tanks.input.keyboard import KeyboardController
@@ -26,9 +39,11 @@ class GameState:
         """Initialize game state."""
         self.tanks: list[Tank] = []
         self.bullets: list[Bullet] = []
+        self.effects: list[VisualEffect] = []
         self.game_map = None
         self.fps: float = 0
         self.running: bool = True
+        self.quit_app: bool = False  # Signal to quit entire application
 
 
 class Game:
@@ -42,7 +57,8 @@ class Game:
         pygame.display.set_caption(WINDOW_TITLE)
 
         # Core systems
-        self.clock = FixedClock(TICKS_PER_SECOND)
+        self.clock = FixedClock(PHYSICS_RATE)  # High frequency for physics
+        self.input_clock = FixedClock(INPUT_RATE)  # Lower frequency for input
         self.render_clock = pygame.time.Clock()  # For FPS limiting
         self.settings = Settings()
         self.events = EventSystem()
@@ -55,9 +71,10 @@ class Game:
         self.collision_system = None  # Created after map loads
         self.movement_system = MovementSystem()
         self.projectile_system = ProjectileSystem()
+        self.sound_manager = SoundManager() if SoundManager else None
 
         # Input handlers
-        self.input_handlers: list["KeyboardController"] = []
+        self.input_handlers: list[KeyboardController] = []
 
     def load_map(self, map_name: str | None = None) -> None:
         """Load a game map.
@@ -112,27 +129,31 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.state.running = False
+                    self.state.quit_app = True  # Signal complete exit
                 elif event.type == pygame.KEYDOWN:
                     self._handle_keydown(event.key)
 
-            # Fixed timestep updates
-            num_updates = self.clock.tick()
-            dt = self.clock.get_delta_time()
+            # Input updates at lower rate for determinism
+            num_input_updates = self.input_clock.tick()
+            input_dt = self.input_clock.get_delta_time()
+            for _ in range(num_input_updates):
+                self.update_input(input_dt)
 
-            for _ in range(num_updates):
-                self.update(dt)
+            # Physics updates at higher rate for accuracy
+            num_physics_updates = self.clock.tick()
+            physics_dt = self.clock.get_delta_time()
+            for _ in range(num_physics_updates):
+                self.update_physics(physics_dt)
 
             # Render
-            self.state.fps = self.clock.get_fps()
+            self.state.fps = self.clock.get_fps()  # Show physics rate
             self.renderer.render_frame(self.state)
 
             # Limit rendering FPS
             self.render_clock.tick(FPS)
 
-        pygame.quit()
-
-    def update(self, dt: float) -> None:
-        """Update game state.
+    def update_input(self, dt: float) -> None:
+        """Update input handlers at fixed rate for determinism.
 
         Args:
             dt: Time delta in seconds.
@@ -141,9 +162,19 @@ class Game:
         if self.settings.paused:
             return
 
-        # Process input handlers
+        # Process input handlers - sample at lower rate
         for handler in self.input_handlers:
             handler.update(dt)
+
+    def update_physics(self, dt: float) -> None:
+        """Update physics at high rate for accuracy.
+
+        Args:
+            dt: Time delta in seconds.
+
+        """
+        if self.settings.paused:
+            return
 
         # Update tanks
         for tank in self.state.tanks:
@@ -157,6 +188,10 @@ class Game:
             hit_wall, normal = self.collision_system.check_bullet_wall_collision(bullet)
             if hit_wall and not self.projectile_system.bounce_bullet(bullet, normal[0], normal[1]):
                 bullet.destroy()
+            elif hit_wall:
+                # Bullet bounced
+                if self.sound_manager:
+                    self.sound_manager.play_bounce()
 
             # Check tank collisions
             hit_tank = self.collision_system.check_bullet_tank_collision(
@@ -166,10 +201,18 @@ class Game:
             if hit_tank:
                 hit_tank.take_damage(bullet.damage)
                 bullet.destroy()
+                if self.sound_manager:
+                    self.sound_manager.play_hit()
 
             # Remove inactive bullets
             if not bullet.active:
                 self.state.bullets.remove(bullet)
+
+        # Update visual effects
+        for effect in self.state.effects[:]:
+            effect.update(dt)
+            if not effect.active:
+                self.state.effects.remove(effect)
 
         # Handle tank collisions
         for i, tank1 in enumerate(self.state.tanks):
@@ -179,6 +222,16 @@ class Game:
             # Tank-tank collisions
             for tank2 in self.state.tanks[i + 1 :]:
                 self.collision_system.check_tank_tank_collision(tank1, tank2)
+
+    def update(self, dt: float) -> None:
+        """Legacy update method for backward compatibility.
+
+        Args:
+            dt: Time delta in seconds.
+
+        """
+        self.update_input(dt)
+        self.update_physics(dt)
 
     def shoot_bullet(self, tank: Tank) -> Bullet | None:
         """Create a bullet from a tank.
@@ -199,6 +252,15 @@ class Game:
 
             bullet = Bullet(tip_x, tip_y, vx, vy, tank.id)
             self.state.bullets.append(bullet)
+
+            # Create muzzle flash effect
+            muzzle_flash = MuzzleFlash(tip_x, tip_y, tank.turret_angle)
+            self.state.effects.append(muzzle_flash)
+
+            # Play shoot sound
+            if self.sound_manager:
+                self.sound_manager.play_shoot()
+
             return bullet
         return None
 
