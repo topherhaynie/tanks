@@ -26,6 +26,8 @@ def run_demo() -> bool:
     if player1_tank:
         controller1 = KeyboardController(player1_tank, game)
         game.add_input_handler(controller1)
+        # Set fog of war perspective to player 1
+        game.renderer.set_perspective_tank(player1_tank)
 
     # Spawn player 2 tank
     player2_tank = game.spawn_tank(1)
@@ -37,7 +39,7 @@ def run_demo() -> bool:
     print("Tank Battle - Two Player Demo")  # noqa: T201
     print("Player 1: WASD to move, Mouse to aim, Space to shoot")  # noqa: T201
     print("Player 2: Arrow keys to move, JL to aim turret, RCtrl to shoot")  # noqa: T201
-    print("Press ESC to quit, F1 to toggle debug, P to pause")  # noqa: T201
+    print("F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, P=pause")  # noqa: T201
     print()  # noqa: T201
 
     game.run()

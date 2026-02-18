@@ -20,6 +20,7 @@ from tanks.core.events import EventSystem
 from tanks.effects.visual import MuzzleFlash, VisualEffect
 from tanks.entities import Bullet, Tank
 from tanks.maps import MapLoader
+from tanks.perception import RadarSystem, TerrainMemory, VisionSystem
 from tanks.physics import CollisionSystem, MovementSystem, ProjectileSystem
 from tanks.rendering import Renderer
 
@@ -72,6 +73,8 @@ class Game:
         self.movement_system = MovementSystem()
         self.projectile_system = ProjectileSystem()
         self.sound_manager = SoundManager() if SoundManager else None
+        self.vision_system = None  # Created after map loads
+        self.radar_system = RadarSystem()
 
         # Input handlers
         self.input_handlers: list[KeyboardController] = []
@@ -92,6 +95,7 @@ class Game:
             self.state.game_map = MapLoader.create_simple_arena(20, 11)
 
         self.collision_system = CollisionSystem(self.state.game_map)
+        self.vision_system = VisionSystem(self.state.game_map)
 
     def spawn_tank(self, spawn_index: int = 0) -> Tank | None:
         """Spawn a tank at a spawn point.
@@ -107,6 +111,8 @@ class Game:
         if spawn_data:
             x, y, team = spawn_data
             tank = Tank(x, y, team)
+            # Initialize fog memory for the tank
+            tank.fog_memory = TerrainMemory(self.state.game_map.width, self.state.game_map.height)
             self.state.tanks.append(tank)
             return tank
         return None
@@ -214,6 +220,9 @@ class Game:
             if not effect.active:
                 self.state.effects.remove(effect)
 
+        # Update perception for all active tanks
+        self.update_perception()
+
         # Handle tank collisions
         for i, tank1 in enumerate(self.state.tanks):
             # Wall collisions
@@ -222,6 +231,27 @@ class Game:
             # Tank-tank collisions
             for tank2 in self.state.tanks[i + 1 :]:
                 self.collision_system.check_tank_tank_collision(tank1, tank2)
+
+    def update_perception(self) -> None:
+        """Update vision and radar for all tanks."""
+        if not self.vision_system:
+            return
+
+        # Collect all entities (tanks + bullets)
+        all_entities = list(self.state.tanks) + list(self.state.bullets)
+
+        for tank in self.state.tanks:
+            if not tank.active:
+                continue
+
+            # Update vision (line of sight)
+            tank.visible_entities = self.vision_system.update_vision(tank, all_entities)
+
+            # Reveal terrain visible to tank
+            self.vision_system.reveal_visible_terrain(tank)
+
+            # Update radar (not blocked by walls)
+            tank.radar_detections = self.radar_system.detect_entities(tank, all_entities)
 
     def update(self, dt: float) -> None:
         """Legacy update method for backward compatibility.
@@ -277,5 +307,9 @@ class Game:
             self.settings.toggle_debug_overlay()
         elif key == pygame.K_F2:
             self.settings.show_hitboxes = not self.settings.show_hitboxes
+        elif key == pygame.K_F3:
+            self.settings.show_vision = not self.settings.show_vision
+        elif key == pygame.K_F4:
+            self.settings.show_radar_blips = not self.settings.show_radar_blips
         elif key == pygame.K_p:
             self.settings.paused = not self.settings.paused

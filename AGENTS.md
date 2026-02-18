@@ -10,8 +10,8 @@ This document provides context and guidelines for AI coding assistants working o
 - Fog of war / limited vision for bots
 - Tournament/training modes for AI development
 
-**Current Phase:** Phase 1 (Core Engine) - **COMPLETE**  
-**Next Phase:** Phase 2 (Perception System) - vision cones, fog of war, terrain memory
+**Current Phase:** Phase 2 (Perception System) - **COMPLETE**  
+**Next Phase:** Phase 3 (Bot Framework) - bot controllers, sensor API, tournament mode
 
 See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed status.
 
@@ -140,11 +140,18 @@ max-complexity = 15  # Collision detection can be complex
 
 ## Important Files
 
-### Critical for Phase 2 (Perception)
-- `src/tanks/core/game.py` - Where perception updates will hook in
-- `src/tanks/entities/tank.py` - Add vision state here
-- `src/tanks/rendering/renderer.py` - Fog of war rendering
-- `src/tanks/perception/` - Empty, ready for vision system
+### Phase 2 - Completed (Perception)
+- `src/tanks/perception/vision.py` - Vision raycasting and radar detection
+- `src/tanks/perception/memory.py` - Terrain memory system  
+- `src/tanks/rendering/renderer.py` - Fog of war rendering with gradients
+- `src/tanks/core/game.py` - Perception update integration
+- `src/tanks/entities/tank.py` - Tank vision state and fog memory
+
+### Critical for Phase 3 (Bot Framework)
+- `src/tanks/bots/` - Bot controller implementations
+- `src/tanks/perception/` - Sensor API for bot inputs
+- `src/tanks/modes/` - Tournament mode framework
+- `src/tanks/input/controller.py` - Base controller interface
 
 ### Configuration
 - `src/tanks/config/constants.py` - Tunable parameters (speeds, sizes, rates)
@@ -194,20 +201,32 @@ Currently minimal automated testing. When adding tests:
 ### Phase 1 (Complete) ✅
 Core engine is stable. Don't heavily refactor unless necessary.
 
-### Phase 2 (Next - Perception)
-Focus areas:
-- `src/tanks/perception/vision.py` - Vision cone raycasting
-- `src/tanks/perception/fog.py` - Fog of war rendering
-- `src/tanks/perception/memory.py` - Terrain memory for bots
-- `src/tanks/rendering/renderer.py` - Fog overlay rendering
+### Phase 2 (Complete) ✅
+Perception system is complete and performant. Key achievements:
+- Vision raycasting with 200px radius
+- Fog of war with 32px tiles and smooth gradients
+- Terrain memory system
+- Radar detection (600px radius, through-wall)
+- 60 FPS maintained with full fog effects
 
-See `docs/Project Plans/03_Sensors_and_Fog.md` for detailed specs.
+Implemented files:
+- `src/tanks/perception/vision.py` - Vision and radar systems
+- `src/tanks/perception/memory.py` - Terrain memory
+- `src/tanks/rendering/renderer.py` - Fog of war rendering
 
-### Phase 4 (Future - Bot Framework)
+### Phase 3 (Next - Bot Framework)
 Focus areas:
 - `src/tanks/bots/bot_controller.py` - AI controller base class
 - `src/tanks/perception/sensors.py` - Bot sensor API
 - `src/tanks/bots/simple_bot.py` - Example bot implementation
+- Tournament mode scaffolding
+
+### Phase 4 (Future - Advanced Bots)
+Focus areas:
+- Machine learning integration
+- Advanced bot behaviors
+- Training infrastructure
+- Performance metrics and analytics
 
 ## Debugging Tips
 

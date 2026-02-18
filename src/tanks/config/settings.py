@@ -11,8 +11,10 @@ class Settings:
 
         # Debug
         self.show_hitboxes = False
+        self.show_vision = False  # Show vision and radar ranges
         self.show_vision_cones = False
         self.show_radar = False
+        self.show_radar_blips = True  # Show radar detection blips (always on by default)
         self.show_fps = True
         self.show_entity_info = False
 

@@ -11,6 +11,7 @@ INPUT_RATE = 30  # Input sampling rate (for determinism)
 
 # Tile System
 TILE_SIZE = 64  # pixels
+FOG_TILE_SIZE = 32  # pixels for fog of war (smaller = more detail)
 TILE_EMPTY = 0
 TILE_WALL_HORIZONTAL = 1
 TILE_WALL_VERTICAL = 2
@@ -34,7 +35,7 @@ SHOOT_COOLDOWN = 0.5  # seconds between shots
 MAX_BULLET_BOUNCES = 1
 
 # Vision System
-VISION_RADIUS = 300  # pixels
+VISION_RADIUS = 200  # pixels
 RADAR_RADIUS = 600  # pixels
 
 # Color definitions (RGB tuples)
@@ -43,9 +44,11 @@ COLOR_WALL = (100, 100, 120)
 COLOR_TANK_FRIENDLY = (50, 150, 50)
 COLOR_TANK_ENEMY = (200, 50, 50)
 COLOR_BULLET = (255, 255, 100)
-COLOR_FOG = (0, 0, 0, 180)  # With alpha
+COLOR_FOG = (0, 0, 0, 240)  # With alpha - very dark
 COLOR_VISION_OVERLAY = (100, 255, 100, 30)
 COLOR_RADAR_OVERLAY = (100, 100, 255, 20)
+COLOR_RADAR_BLIP = (100, 200, 255, 200)
+COLOR_RADAR_SWEEP = (100, 200, 255, 60)
 
 # Debug Colors
 COLOR_DEBUG_HITBOX = (255, 0, 255)

@@ -1,4 +1,6 @@
 """Perception system (vision, radar, fog of war)."""
 
-# Phase 2 - Perception systems
-# Will contain vision, radar, and fog of war implementations
+from tanks.perception.memory import TerrainMemory
+from tanks.perception.vision import RadarSystem, VisionSystem
+
+__all__ = ["RadarSystem", "TerrainMemory", "VisionSystem"]

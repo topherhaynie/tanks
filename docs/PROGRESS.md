@@ -99,17 +99,101 @@ All objectives met. System is stable with:
 
 ---
 
-## Next Steps: Phase 2 - Perception
+# Phase 2 Progress - Perception System
+
+**Status**: ✅ COMPLETE
+
+## Completed Features
+
+### Vision System
+- [x] 200px vision radius with line-of-sight raycasting
+- [x] DDA algorithm for efficient wall detection
+- [x] Quarter-tile step precision (TILE_SIZE/4)
+- [x] Walls reveal themselves when encountered
+- [x] Incremental fog revelation along raycast path
+
+### Fog of War
+- [x] 32px fog tiles (half of 64px game tiles for detail)
+- [x] Two-pass rendering system (solid fog + gradient edges)
+- [x] Pre-rendered gradient stamp for performance
+- [x] Smooth circular gradients with 20-step blending
+- [x] 2x FOG_TILE_SIZE radius gradient stamps
+- [x] Exponential alpha falloff for natural appearance
+- [x] Entity visibility filtering based on vision/fog
+- [x] Maintains 60 FPS with full fog effects
+
+### Terrain Memory
+- [x] Per-tank fog memory system
+- [x] Grid-based boolean array (40x22 fog tiles for 20x11 map)
+- [x] Persistent terrain discovery
+- [x] Revealed tiles stay visible even when out of vision range
+- [x] Memory-based entity visibility (entities in discovered areas visible)
+
+### Radar System
+- [x] 600px radar radius (through-wall detection)
+- [x] Detects tanks and mines only (ignores bullets/obstacles)
+- [x] Team-based filtering (doesn't detect teammates)
+- [x] Pulsing radar blip visualization
+- [x] Radar blips rendered on top of fog layer
+- [x] Distance-based radar blip rendering
+
+### Debug Controls
+- [x] F3: Toggle fog of war
+- [x] F4: Toggle perspective tank (switch fog viewpoint)
+- [x] Existing F1/F2 debug overlays work with perception
+
+### Code Quality
+- [x] Type annotations throughout perception system
+- [x] Google-style docstrings
+- [x] Passes Ruff linting
+- [x] Organized into perception/ module
+
+## Phase 2 Implementation Details
+
+### Performance Optimization
+- Used pre-rendered gradient stamp (created once at init)
+- Only apply gradients at fog edges (_has_fog_neighbor check)
+- Fog tile size = 32px for detail without overhead
+- Efficient raycasting with early wall detection
+
+### Visual Quality Decisions
+- Larger gradient stamps (2x vs 1.5x FOG_TILE_SIZE) for smoother blending
+- Exponential alpha falloff (progress^1.5) for natural fog appearance
+- Reveal all fog tiles along raycast path for consistent directional behavior
+- Reveal wall tiles AND adjacent tiles for proper wall surface visibility
+
+## Known Issues
+None currently identified.
+
+## Future Enhancements
+- [ ] **Radar Enhancement**: Replace current pulsing circles with realistic rotating radar beam effect:
+  - Green rotating beam emanating from tank
+  - Faded afterimage trail as beam rotates
+  - Temporary blips at last known entity locations (fade over time)
+  - More authentic radar sweep appearance
+
+## Phase 2 Review
+All objectives met. Perception system is stable with:
+- Smooth fog of war with natural appearance
+- Accurate line-of-sight vision
+- Performant rendering (60 FPS maintained)
+- Incremental terrain discovery
+- Through-wall radar detection
+- Clean separation of vision and radar systems
+
+---
+
+## Next Steps: Phase 3 - Bot Framework
 
 ### Upcoming Features
-- [ ] Vision cone system
-- [ ] Fog of war
-- [ ] Terrain discovery and memory
-- [ ] Radar detection system
-- [ ] Sensor API for bots
+- [ ] Bot controller base class
+- [ ] Sensor API for bot inputs
+- [ ] Simple bot implementation (random/wander behavior)
+- [ ] Tournament mode framework
+- [ ] Bot performance metrics
 
 ### Implementation Notes
-- Vision system will use raycasting
-- Fog rendering will be a separate layer
-- Memory system will track discovered tiles
-- Radar as circular detection range
+- Bots will use same controller interface as keyboard
+- Sensors will expose vision/radar data in bot-friendly format
+- Start simple (random movement) before complex AI
+- Use perception system output for bot decision-making

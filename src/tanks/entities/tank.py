@@ -36,6 +36,7 @@ class Tank(Entity):
 
         # Perception (filled by perception system)
         self.visible_entities = []
+        self.radar_detections = []  # List of (entity, distance, angle)
         self.fog_memory = None
 
     def update(self, dt: float) -> None:
