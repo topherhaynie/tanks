@@ -1,0 +1,20 @@
+[build-system]
+requires=["setuptools"]
+[project]
+name="Tanks"
+version="1.0.0"
+authors=[
+    {name = "Topher Haynie", email = "christopher.j.haynie7@gmail.com"}
+]
+description="A fun tank game for RL agent exploration!"
+readme="README.md"
+license="MIT"
+requires-python = ">=3.10"
+dependencies=[
+    "pygame>=2.5.0",
+]
+[project.urls]
+Repository="https://github.com/topherhaynie/tanks"
+
+[tool.setuptools.packages.find]
+where = ["src"]

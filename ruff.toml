@@ -1,0 +1,11 @@
+[lint]
+ignore = [
+    "PLR0913",  # Too many arguments in function definition
+    "FBT001",   # Boolean positional argument in function definition
+    "FBT002",   # Boolean default positional argument in function definition
+    "FBT003",   # Boolean positional value in function call
+    "ANN401",   # Dynamically typed expressions (Any) are disallowed
+]
+
+[lint.mccabe]
+max-complexity = 15
