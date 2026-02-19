@@ -1,0 +1,33 @@
+{
+    "phase_a_enabled": true,
+    "phase_b_enabled": true,
+    "phase_c_enabled": true,
+    "phase_a_episodes_per_stage": 100,
+    "phase_b_episodes": 1200,
+    "phase_c_episodes_per_stage": 300,
+    "exploration_weight": 10.0,
+    "save_interval": 50,
+    "log_interval": 10,
+    "_profile": "m4-competitive-self-play-heavy",
+    "_intent": "Bias training toward self-play and generalization while keeping a shorter foundational Phase A.",
+    "_expected_runtime": "~10-14 hours depending on render/debug load and background apps",
+    "_notes": {
+        "phase_a": "Shorter curriculum for foundational skills (SmartBot in early stages, then self-play)",
+        "phase_b": "Main workload for map generalization and opponent-pool growth",
+        "phase_c": "Heavier survival training for 1v2 and 1v3 competency",
+        "exploration_weight": "Raised to 10.0 to discourage circling and encourage coverage"
+    },
+    "_quick_adjustments": {
+        "faster_run": {
+            "phase_a_episodes_per_stage": 75,
+            "phase_b_episodes": 800,
+            "phase_c_episodes_per_stage": 200
+        },
+        "max_competitive": {
+            "phase_a_episodes_per_stage": 150,
+            "phase_b_episodes": 1600,
+            "phase_c_episodes_per_stage": 400,
+            "exploration_weight": 10.0
+        }
+    }
+}

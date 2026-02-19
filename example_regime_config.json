@@ -1,0 +1,32 @@
+{
+    "phase_a_enabled": true,
+    "phase_b_enabled": true,
+    "phase_c_enabled": true,
+    "phase_a_episodes_per_stage": 150,
+    "phase_b_episodes": 500,
+    "phase_c_episodes_per_stage": 200,
+    "exploration_weight": 8.0,
+    "save_interval": 50,
+    "log_interval": 10,
+    "_comment_phase_a": "Map-specific curriculum teaches fundamental skills",
+    "_comment_phase_b": "Random maps train generalization and adaptability",
+    "_comment_phase_c": "Survival scenarios teach defensive tactics",
+    "_tuning_notes": {
+        "exploration_weight": "Increase if agent isn't exploring enough (circles). Typical range: 5.0-15.0",
+        "episodes_per_stage": "Increase if agent isn't reaching win rate thresholds. Typical range: 100-300",
+        "phase_b_episodes": "More episodes = better generalization. Typical range: 300-1000",
+        "skip_phases": "Set phase_X_enabled to false to skip that phase"
+    },
+    "_quick_test": {
+        "description": "Quick test configuration (run in ~1 hour)",
+        "phase_a_episodes_per_stage": 50,
+        "phase_b_episodes": 100,
+        "phase_c_episodes_per_stage": 50
+    },
+    "_full_training": {
+        "description": "Full professional training (run overnight ~8-12 hours)",
+        "phase_a_episodes_per_stage": 300,
+        "phase_b_episodes": 1000,
+        "phase_c_episodes_per_stage": 400
+    }
+}

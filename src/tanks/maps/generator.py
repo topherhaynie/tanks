@@ -296,11 +296,7 @@ class MapGenerator:
             for dy in range(-size, size + 1):
                 if random.random() < 0.6:  # Sparse cluster
                     x, y = center_x + dx, center_y + dy
-                    if (
-                        1 <= x < game_map.width - 1
-                        and 1 <= y < game_map.height - 1
-                        and game_map.get_tile(x, y) == 0
-                    ):
+                    if 1 <= x < game_map.width - 1 and 1 <= y < game_map.height - 1 and game_map.get_tile(x, y) == 0:
                         game_map.set_tile(x, y, TILE_WALL_SOLID)
 
     def _add_room(
@@ -400,8 +396,19 @@ class MapGenerator:
         if width < 4 or height < 4:
             return
 
+        can_divide_h = height >= 5
+        can_divide_v = width >= 5
+
+        if not can_divide_h and not can_divide_v:
+            return
+
         # Choose division axis
-        horizontal = height > width or (height == width and random.random() < 0.5)
+        if can_divide_h and not can_divide_v:
+            horizontal = True
+        elif can_divide_v and not can_divide_h:
+            horizontal = False
+        else:
+            horizontal = height > width or (height == width and random.random() < 0.5)
 
         if horizontal:
             # Divide horizontally
@@ -414,7 +421,11 @@ class MapGenerator:
 
             self._recursive_divide(game_map, x, y, width, wall_y - y)
             self._recursive_divide(
-                game_map, x, wall_y + 1, width, y + height - wall_y - 1
+                game_map,
+                x,
+                wall_y + 1,
+                width,
+                y + height - wall_y - 1,
             )
         else:
             # Divide vertically
@@ -427,7 +438,11 @@ class MapGenerator:
 
             self._recursive_divide(game_map, x, y, wall_x - x, height)
             self._recursive_divide(
-                game_map, wall_x + 1, y, x + width - wall_x - 1, height
+                game_map,
+                wall_x + 1,
+                y,
+                x + width - wall_x - 1,
+                height,
             )
 
     def _apply_symmetry(self, game_map: Map) -> None:
@@ -482,9 +497,7 @@ class MapGenerator:
                 _ = (2 * 3.14159 * i) / self.config.num_spawn_points  # angle (unused)
                 radius = min(game_map.width, game_map.height) * 0.35
                 x = game_map.width / 2 + radius * (1 if i % 2 == 0 else -1)
-                y = game_map.height / 2 + radius * (
-                    1 if i >= self.config.num_spawn_points / 2 else -1
-                )
+                y = game_map.height / 2 + radius * (1 if i >= self.config.num_spawn_points / 2 else -1)
                 positions.append((x, y))
 
         # Convert to pixel coordinates and find clear spots

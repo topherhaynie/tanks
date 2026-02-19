@@ -1,0 +1,11 @@
+{
+    "phase_a_enabled": true,
+    "phase_b_enabled": true,
+    "phase_c_enabled": true,
+    "phase_a_episodes_per_stage": 1,
+    "phase_b_episodes": 1,
+    "phase_c_episodes_per_stage": 1,
+    "exploration_weight": 8.0,
+    "save_interval": 1,
+    "log_interval": 1
+}
