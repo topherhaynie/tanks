@@ -91,7 +91,9 @@ class Game:
         """
         if map_name:
             # Load from file
-            map_path = Path(__file__).parent.parent / "maps" / "data" / f"{map_name}.json"
+            map_path = (
+                Path(__file__).parent.parent / "maps" / "data" / f"{map_name}.json"
+            )
             self.state.game_map = MapLoader.load_from_file(str(map_path))
         else:
             # Create simple arena (20 tiles wide x 11 tiles tall = 1280x704 pixels)
@@ -115,7 +117,9 @@ class Game:
             x, y, team = spawn_data
             tank = Tank(x, y, team)
             # Initialize fog memory for the tank
-            tank.fog_memory = TerrainMemory(self.state.game_map.width, self.state.game_map.height)
+            tank.fog_memory = TerrainMemory(
+                self.state.game_map.width, self.state.game_map.height
+            )
             self.state.tanks.append(tank)
             return tank
         return None
@@ -196,7 +200,9 @@ class Game:
 
             # Check wall collisions
             hit_wall, normal = self.collision_system.check_bullet_wall_collision(bullet)
-            if hit_wall and not self.projectile_system.bounce_bullet(bullet, normal[0], normal[1]):
+            if hit_wall and not self.projectile_system.bounce_bullet(
+                bullet, normal[0], normal[1]
+            ):
                 bullet.destroy()
             elif hit_wall:
                 # Bullet bounced
@@ -255,7 +261,9 @@ class Game:
             self.vision_system.reveal_visible_terrain(tank)
 
             # Update radar (not blocked by walls)
-            tank.radar_detections = self.radar_system.detect_entities(tank, all_entities)
+            tank.radar_detections = self.radar_system.detect_entities(
+                tank, all_entities
+            )
 
             # Check for new radar detections (trigger sound)
             current_radar_entities = {entity for entity, _, _ in tank.radar_detections}
@@ -316,7 +324,16 @@ class Game:
                 if not has_recent_blip:
                     # Capture snapshot at time of detection
                     entity_type = type(entity).__name__
-                    tank.radar_blips.append((entity, current_time, entity_angle, entity.x, entity.y, entity_type))
+                    tank.radar_blips.append(
+                        (
+                            entity,
+                            current_time,
+                            entity_angle,
+                            entity.x,
+                            entity.y,
+                            entity_type,
+                        )
+                    )
 
         # Remove old blips (faded out)
         tank.radar_blips = [

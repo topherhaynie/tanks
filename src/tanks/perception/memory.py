@@ -19,7 +19,9 @@ class TerrainMemory:
         self.fog_height = (map_height * TILE_SIZE) // FOG_TILE_SIZE
 
         # 2D grid of booleans - True if fog tile has been revealed
-        self.revealed: list[list[bool]] = [[False for _ in range(self.fog_width)] for _ in range(self.fog_height)]
+        self.revealed: list[list[bool]] = [
+            [False for _ in range(self.fog_width)] for _ in range(self.fog_height)
+        ]
 
     def reveal_tile(self, tx: int, ty: int) -> None:
         """Mark a fog tile as revealed.
@@ -56,8 +58,12 @@ class TerrainMemory:
             radius_tiles: Radius in fog tiles.
 
         """
-        for y in range(max(0, ty - radius_tiles), min(self.fog_height, ty + radius_tiles + 1)):
-            for x in range(max(0, tx - radius_tiles), min(self.fog_width, tx + radius_tiles + 1)):
+        for y in range(
+            max(0, ty - radius_tiles), min(self.fog_height, ty + radius_tiles + 1)
+        ):
+            for x in range(
+                max(0, tx - radius_tiles), min(self.fog_width, tx + radius_tiles + 1)
+            ):
                 # Check if within circular radius
                 dist_sq = (x - tx) ** 2 + (y - ty) ** 2
                 if dist_sq <= radius_tiles**2:

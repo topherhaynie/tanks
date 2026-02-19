@@ -163,7 +163,10 @@ def _attack_target(state: BotState, target: VisibleEntity) -> BotAction:
 
     turn_right = body_diff > ATTACK_BODY_TURN_THRESHOLD
     turn_left = body_diff < -ATTACK_BODY_TURN_THRESHOLD
-    shoot = abs(turret_diff) < ATTACK_TURRET_AIM_THRESHOLD and state.self_state.shoot_cooldown <= 0.0
+    shoot = (
+        abs(turret_diff) < ATTACK_TURRET_AIM_THRESHOLD
+        and state.self_state.shoot_cooldown <= 0.0
+    )
 
     return BotAction(
         move_forward=True,

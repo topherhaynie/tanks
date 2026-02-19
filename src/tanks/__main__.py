@@ -2,19 +2,25 @@
 
 import pygame
 
-from tanks.demo import run_bot_battle_demo, run_bot_demo, run_demo
+from tanks.demo import (
+    run_bot_battle_demo,
+    run_bot_demo,
+    run_demo,
+    run_mixed_bot_battle_demo,
+)
 
 
 def print_menu() -> None:
     """Print the game mode selection menu."""
     print("=" * 50)  # noqa: T201
-    print("TANK BATTLE - Phase 1")  # noqa: T201
+    print("TANK BATTLE - Phase 4")  # noqa: T201
     print("=" * 50)  # noqa: T201
     print()  # noqa: T201
     print("Select Game Mode:")  # noqa: T201
     print("  1. Two-Player Demo")  # noqa: T201
     print("  2. Player vs Bot")  # noqa: T201
     print("  3. Bot vs Bot (Global View)")  # noqa: T201
+    print("  4. Mixed Bot Battle (C++ + Python) 🆕")  # noqa: T201
     print("  q. Quit")  # noqa: T201
     print()  # noqa: T201
 
@@ -41,6 +47,12 @@ def main() -> None:
                 print("\nReturning to menu...\n")  # noqa: T201
             elif choice == "3":
                 should_quit = run_bot_battle_demo()
+                if should_quit:
+                    print("\nThanks for playing!")  # noqa: T201
+                    break
+                print("\nReturning to menu...\n")  # noqa: T201
+            elif choice == "4":
+                should_quit = run_mixed_bot_battle_demo()
                 if should_quit:
                     print("\nThanks for playing!")  # noqa: T201
                     break

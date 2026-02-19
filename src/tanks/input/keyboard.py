@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 class KeyboardController(Controller):
     """Keyboard-based tank controller."""
 
-    def __init__(self, tank: "Tank", game: "Game", key_bindings: dict[str, int] | None = None) -> None:
+    def __init__(
+        self, tank: "Tank", game: "Game", key_bindings: dict[str, int] | None = None
+    ) -> None:
         """Create a keyboard controller.
 
         Args:
@@ -78,7 +80,11 @@ class KeyboardController(Controller):
 
         # Radar jamming (single activation on key press)
         jam_key_pressed = keys[self.key_bindings["jam"]]
-        if jam_key_pressed and not self.jam_key_was_pressed and hasattr(self.tank, "activate_jamming"):
+        if (
+            jam_key_pressed
+            and not self.jam_key_was_pressed
+            and hasattr(self.tank, "activate_jamming")
+        ):
             self.tank.activate_jamming()
         self.jam_key_was_pressed = jam_key_pressed
 
@@ -149,6 +155,10 @@ class KeyboardController2(Controller):
 
         # Radar jamming (single activation on key press)
         jam_key_pressed = keys[self.key_bindings["jam"]]
-        if jam_key_pressed and not self.jam_key_was_pressed and hasattr(self.tank, "activate_jamming"):
+        if (
+            jam_key_pressed
+            and not self.jam_key_was_pressed
+            and hasattr(self.tank, "activate_jamming")
+        ):
             self.tank.activate_jamming()
         self.jam_key_was_pressed = jam_key_pressed

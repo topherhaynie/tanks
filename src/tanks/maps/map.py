@@ -6,7 +6,9 @@ from tanks.config.constants import TILE_EMPTY, TILE_SIZE
 class Map:
     """Tile-based game map."""
 
-    def __init__(self, width: int, height: int, tiles: list[list[int]] | None = None) -> None:
+    def __init__(
+        self, width: int, height: int, tiles: list[list[int]] | None = None
+    ) -> None:
         """Create a map.
 
         Args:

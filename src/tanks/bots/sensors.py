@@ -3,7 +3,14 @@
 import math
 from typing import TYPE_CHECKING
 
-from tanks.bots.bot_api import BotState, FogMemorySummary, MapBounds, RadarHit, SelfState, VisibleEntity
+from tanks.bots.bot_api import (
+    BotState,
+    FogMemorySummary,
+    MapBounds,
+    RadarHit,
+    SelfState,
+    VisibleEntity,
+)
 from tanks.config.constants import TILE_SIZE
 
 if TYPE_CHECKING:
@@ -29,6 +36,7 @@ def build_bot_state(tank: "Tank", game: "Game", tick_id: int, dt: float) -> BotS
     map_width_px, map_height_px = _get_map_bounds(game)
 
     self_state = SelfState(
+        id=tank.id,
         x=tank.x,
         y=tank.y,
         rotation=math.radians(tank.angle),
@@ -39,8 +47,13 @@ def build_bot_state(tank: "Tank", game: "Game", tick_id: int, dt: float) -> BotS
         team=tank.team,
     )
 
-    visible_entities = [_build_visible_entity(tank, entity) for entity in tank.visible_entities]
-    radar_hits = [_build_radar_hit(tank, entity) for entity, _distance, _angle_deg in tank.radar_detections]
+    visible_entities = [
+        _build_visible_entity(tank, entity) for entity in tank.visible_entities
+    ]
+    radar_hits = [
+        _build_radar_hit(tank, entity)
+        for entity, _distance, _angle_deg in tank.radar_detections
+    ]
 
     fog_memory = _summarize_fog_memory(tank.fog_memory) if tank.fog_memory else None
 
@@ -104,7 +117,9 @@ def _build_radar_hit(tank: "Tank", entity: "Entity") -> RadarHit:
 def _relative_bearing(tank: "Tank", dx: float, dy: float) -> float:
     absolute_angle = math.atan2(dy, dx)
     tank_angle = math.radians(tank.angle)
-    return math.atan2(math.sin(absolute_angle - tank_angle), math.cos(absolute_angle - tank_angle))
+    return math.atan2(
+        math.sin(absolute_angle - tank_angle), math.cos(absolute_angle - tank_angle)
+    )
 
 
 def _entity_kind(entity: "Entity") -> str:

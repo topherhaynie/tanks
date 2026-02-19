@@ -12,7 +12,9 @@ INPUT_RATE = 30  # Input sampling rate (for determinism)
 # Tile System
 TILE_SIZE = 64  # pixels
 FOG_TILE_SIZE = 16  # pixels for fog of war (smaller = more detail)
-FOG_GRADIENT_SCALE = 1.7  # Multiplier for fog gradient stamp size (1.0 = same as FOG_TILE_SIZE)
+FOG_GRADIENT_SCALE = (
+    1.7  # Multiplier for fog gradient stamp size (1.0 = same as FOG_TILE_SIZE)
+)
 TILE_EMPTY = 0
 TILE_WALL_HORIZONTAL = 1
 TILE_WALL_VERTICAL = 2
@@ -39,7 +41,9 @@ MAX_BULLET_BOUNCES = 1
 VISION_RADIUS = 150  # pixels - fog revelation range (active vision)
 ENTITY_VISION_RADIUS = 600  # pixels - extended entity vision through revealed areas
 RADAR_RADIUS = 400  # pixels - actual radar detection range
-RADAR_VISUAL_RADIUS = 50  # pixels - visual radar circle radius (can differ from detection for tactics)
+RADAR_VISUAL_RADIUS = (
+    50  # pixels - visual radar circle radius (can differ from detection for tactics)
+)
 RADAR_JAMMING_RADIUS = 350  # pixels - radius within which jamming affects enemy radar
 RADAR_JAMMING_DURATION = 3.0  # seconds - how long jamming lasts
 RADAR_JAMMING_COOLDOWN = 10.0  # seconds - cooldown between jamming uses

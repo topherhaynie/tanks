@@ -28,6 +28,7 @@ class FogMemorySummary:
 class SelfState:
     """State of the bot-controlled tank."""
 
+    id: int
     x: float
     y: float
     rotation: float

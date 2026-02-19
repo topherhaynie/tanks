@@ -51,7 +51,9 @@ class TankRenderer:
             if tank == perspective_tank or tank in perspective_tank.visible_entities:
                 self._draw_tank(tank, alpha=255)
 
-    def render_observer(self, tanks: list["Tank"], observer_tanks: list["Tank"], hidden_alpha: float) -> None:
+    def render_observer(
+        self, tanks: list["Tank"], observer_tanks: list["Tank"], hidden_alpha: float
+    ) -> None:
         """Render tanks for a global observer view with visibility cues.
 
         Args:
@@ -89,12 +91,20 @@ class TankRenderer:
         angle_rad = math.radians(tank.angle)
         end_x = center + math.cos(angle_rad) * tank.radius
         end_y = center + math.sin(angle_rad) * tank.radius
-        pygame.draw.line(surface, (255, 255, 255, alpha), (center, center), (end_x, end_y), 2)
+        pygame.draw.line(
+            surface, (255, 255, 255, alpha), (center, center), (end_x, end_y), 2
+        )
 
         turret_angle_rad = math.radians(tank.turret_angle)
         turret_end_x = center + math.cos(turret_angle_rad) * (tank.radius + 8)
         turret_end_y = center + math.sin(turret_angle_rad) * (tank.radius + 8)
-        pygame.draw.line(surface, (200, 200, 200, alpha), (center, center), (turret_end_x, turret_end_y), 4)
+        pygame.draw.line(
+            surface,
+            (200, 200, 200, alpha),
+            (center, center),
+            (turret_end_x, turret_end_y),
+            4,
+        )
 
         self._draw_hp_bar(surface, tank, alpha)
 
@@ -115,10 +125,16 @@ class TankRenderer:
         bar_x = center - bar_width / 2
         bar_y = center - tank.radius - 10
 
-        pygame.draw.rect(surface, (200, 50, 50, alpha), (bar_x, bar_y, bar_width, bar_height))
+        pygame.draw.rect(
+            surface, (200, 50, 50, alpha), (bar_x, bar_y, bar_width, bar_height)
+        )
 
         hp_ratio = tank.hp / tank.max_hp
-        pygame.draw.rect(surface, (50, 200, 50, alpha), (bar_x, bar_y, bar_width * hp_ratio, bar_height))
+        pygame.draw.rect(
+            surface,
+            (50, 200, 50, alpha),
+            (bar_x, bar_y, bar_width * hp_ratio, bar_height),
+        )
 
     def _is_visible_to_enemy(self, tank: "Tank", observer_tanks: list["Tank"]) -> bool:
         has_enemy = False

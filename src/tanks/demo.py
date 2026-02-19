@@ -1,8 +1,16 @@
 """Demo modes for local play."""
 
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tanks.bots import BotController, SimpleBot, SmartBot
+from tanks.bots import (
+    BotController,
+    ExternalBotController,
+    ExternalBotRunner,
+    SimpleBot,
+    SmartBot,
+)
 from tanks.config.constants import TILE_SIZE
 from tanks.core import Game
 from tanks.input import KeyboardController
@@ -130,6 +138,95 @@ def run_bot_battle_demo() -> bool:
     print()  # noqa: T201
 
     game.run()
+
+    return game.state.quit_app
+
+
+def run_mixed_bot_battle_demo() -> bool:
+    """Run a 3-way bot battle: C++ bot vs Python SimpleBot vs Python SmartBot.
+
+    Demonstrates external C++ bot competing with internal Python bots.
+    Uses global observer view to watch all three bots.
+
+    Returns:
+        True if user wants to quit the application, False to return to menu.
+
+    """
+    # Find C++ bot executable
+    cpp_bot_path = Path(__file__).parent / "bots" / "cpp" / "build" / "simple_bot"
+
+    if not cpp_bot_path.exists():
+        print("❌ C++ bot not found!")  # noqa: T201
+        print(f"Expected at: {cpp_bot_path}")  # noqa: T201
+        print(
+            "Build it with: cd src/tanks/bots/cpp && mkdir -p build && cd build && cmake .. && make"
+        )  # noqa: T201
+        print("\nPress Enter to return to menu...")  # noqa: T201
+        input()
+        return False
+
+    game = Game()
+    game.load_map()
+
+    # Track runner for cleanup
+    runner = None
+
+    # Spawn Bot 1: C++ External Bot (Team 0)
+    cpp_bot_tank = game.spawn_tank(0)
+    if cpp_bot_tank:
+        _position_tank(cpp_bot_tank, game, 0.25, 0.3)  # Left side
+        try:
+            runner = ExternalBotRunner(str(cpp_bot_path), timeout_ms=8.0)
+            runner.start()
+            cpp_controller = ExternalBotController(cpp_bot_tank, game, runner)
+            game.add_input_handler(cpp_controller)
+            print(f"✓ C++ bot started: {cpp_bot_path.name}")  # noqa: T201
+        except Exception as e:
+            print(f"❌ Failed to start C++ bot: {e}")  # noqa: T201
+            print("Continuing without C++ bot...")  # noqa: T201
+
+    # Spawn Bot 2: Python SimpleBot (Team 1)
+    simple_bot_tank = game.spawn_tank(1)
+    if simple_bot_tank:
+        _position_tank(simple_bot_tank, game, 0.75, 0.3)  # Right side
+        simple_controller = BotController(simple_bot_tank, game, SimpleBot())
+        game.add_input_handler(simple_controller)
+
+    # Spawn Bot 3: Python SmartBot (Team 2)
+    smart_bot_tank = game.spawn_tank(2)
+    if smart_bot_tank:
+        _position_tank(smart_bot_tank, game, 0.5, 0.7)  # Bottom center
+        smart_controller = BotController(smart_bot_tank, game, SmartBot())
+        game.add_input_handler(smart_controller)
+
+    # Set up observer view with three fog colors
+    game.renderer.set_perspective_tank(None)
+    active_tanks = [
+        tank for tank in [cpp_bot_tank, simple_bot_tank, smart_bot_tank] if tank
+    ]
+    game.renderer.set_observer_view(
+        active_tanks,
+        fog_opacity=0.5,
+        fog_colors=((70, 110, 255), (255, 90, 90), (90, 255, 90)),  # Blue, Red, Green
+        hidden_alpha=0.7,
+    )
+
+    print("\nTank Battle - Mixed Bot Battle (3-Way)")  # noqa: T201
+    print("Bot 1 (Blue):  C++ External Bot (seek/wander)")  # noqa: T201
+    print("Bot 2 (Red):   Python SimpleBot (seek/wander)")  # noqa: T201
+    print("Bot 3 (Green): Python SmartBot (radar pursuit)")  # noqa: T201
+    print("F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, P=pause")  # noqa: T201
+    print()  # noqa: T201
+
+    game.run()
+
+    # Clean up external bot process
+    if runner is not None:
+        try:
+            runner.stop()
+            print("✓ C++ bot stopped")  # noqa: T201
+        except Exception as e:
+            print(f"Warning: Error stopping C++ bot: {e}", file=sys.stderr)
 
     return game.state.quit_app
 

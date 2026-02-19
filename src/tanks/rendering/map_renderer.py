@@ -59,12 +59,28 @@ class MapRenderer:
         y = ty * TILE_SIZE
 
         if tile_type == TILE_WALL_HORIZONTAL:
-            pygame.draw.line(self._screen, COLOR_WALL, (x, y + TILE_SIZE // 2), (x + TILE_SIZE, y + TILE_SIZE // 2), 3)
+            pygame.draw.line(
+                self._screen,
+                COLOR_WALL,
+                (x, y + TILE_SIZE // 2),
+                (x + TILE_SIZE, y + TILE_SIZE // 2),
+                3,
+            )
         elif tile_type == TILE_WALL_VERTICAL:
-            pygame.draw.line(self._screen, COLOR_WALL, (x + TILE_SIZE // 2, y), (x + TILE_SIZE // 2, y + TILE_SIZE), 3)
+            pygame.draw.line(
+                self._screen,
+                COLOR_WALL,
+                (x + TILE_SIZE // 2, y),
+                (x + TILE_SIZE // 2, y + TILE_SIZE),
+                3,
+            )
         elif tile_type == TILE_WALL_DIAGONAL_NE:
-            pygame.draw.line(self._screen, COLOR_WALL, (x, y + TILE_SIZE), (x + TILE_SIZE, y), 3)
+            pygame.draw.line(
+                self._screen, COLOR_WALL, (x, y + TILE_SIZE), (x + TILE_SIZE, y), 3
+            )
         elif tile_type == TILE_WALL_DIAGONAL_NW:
-            pygame.draw.line(self._screen, COLOR_WALL, (x, y), (x + TILE_SIZE, y + TILE_SIZE), 3)
+            pygame.draw.line(
+                self._screen, COLOR_WALL, (x, y), (x + TILE_SIZE, y + TILE_SIZE), 3
+            )
         elif tile_type == TILE_WALL_SOLID:
             pygame.draw.rect(self._screen, COLOR_WALL, (x, y, TILE_SIZE, TILE_SIZE))

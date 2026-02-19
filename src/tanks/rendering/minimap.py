@@ -72,13 +72,19 @@ class MinimapRenderer:
         minimap.fill(COLOR_MINIMAP_BACKGROUND)
 
         # Draw map elements (pass offsets to center content)
-        self._draw_revealed_areas(minimap, tank, game_state.game_map, scale, offset_x, offset_y)
+        self._draw_revealed_areas(
+            minimap, tank, game_state.game_map, scale, offset_x, offset_y
+        )
         self._draw_ranges(minimap, tank, scale, offset_x, offset_y)
-        self._draw_tanks(minimap, game_state.tanks, tank, scale, offset_x, offset_y, current_time)
+        self._draw_tanks(
+            minimap, game_state.tanks, tank, scale, offset_x, offset_y, current_time
+        )
         self._draw_radar_blips(minimap, tank, scale, offset_x, offset_y, current_time)
 
         # Draw border and blit to screen
-        pygame.draw.rect(minimap, COLOR_MINIMAP_BORDER, (0, 0, MINIMAP_SIZE, MINIMAP_SIZE), 2)
+        pygame.draw.rect(
+            minimap, COLOR_MINIMAP_BORDER, (0, 0, MINIMAP_SIZE, MINIMAP_SIZE), 2
+        )
         self._screen.blit(minimap, (minimap_x, minimap_y))
 
     def _draw_revealed_areas(
@@ -117,7 +123,9 @@ class MinimapRenderer:
 
                     # Draw revealed area as lighter background
                     revealed_color = (40, 40, 60, 100)
-                    pygame.draw.rect(minimap, revealed_color, (mini_x, mini_y, mini_size, mini_size))
+                    pygame.draw.rect(
+                        minimap, revealed_color, (mini_x, mini_y, mini_size, mini_size)
+                    )
 
         # Draw walls in revealed areas
         for y in range(game_map.height):
@@ -162,7 +170,11 @@ class MinimapRenderer:
                         mini_x = int(x * TILE_SIZE * scale + offset_x)
                         mini_y = int(y * TILE_SIZE * scale + offset_y)
                         mini_size = max(1, int(TILE_SIZE * scale))
-                        pygame.draw.rect(minimap, COLOR_MINIMAP_WALL, (mini_x, mini_y, mini_size, mini_size))
+                        pygame.draw.rect(
+                            minimap,
+                            COLOR_MINIMAP_WALL,
+                            (mini_x, mini_y, mini_size, mini_size),
+                        )
 
     def _draw_ranges(
         self,
@@ -187,11 +199,23 @@ class MinimapRenderer:
 
         # Draw radar range circle (actual detection radius for tactical accuracy)
         radar_mini_radius = int(RADAR_RADIUS * scale)
-        pygame.draw.circle(minimap, COLOR_MINIMAP_RADAR_RANGE, (tank_mini_x, tank_mini_y), radar_mini_radius, 1)
+        pygame.draw.circle(
+            minimap,
+            COLOR_MINIMAP_RADAR_RANGE,
+            (tank_mini_x, tank_mini_y),
+            radar_mini_radius,
+            1,
+        )
 
         # Draw vision range circle
         vision_mini_radius = int(VISION_RADIUS * scale)
-        pygame.draw.circle(minimap, COLOR_MINIMAP_VISION_RANGE, (tank_mini_x, tank_mini_y), vision_mini_radius, 1)
+        pygame.draw.circle(
+            minimap,
+            COLOR_MINIMAP_VISION_RANGE,
+            (tank_mini_x, tank_mini_y),
+            vision_mini_radius,
+            1,
+        )
 
     def _draw_tanks(
         self,
@@ -223,21 +247,40 @@ class MinimapRenderer:
             other_mini_y = int(other_tank.y * scale + offset_y)
 
             if other_tank == perspective_tank:
-                self._draw_perspective_tank(minimap, other_tank, other_mini_x, other_mini_y)
+                self._draw_perspective_tank(
+                    minimap, other_tank, other_mini_x, other_mini_y
+                )
             elif other_tank.team == perspective_tank.team:
-                pygame.draw.circle(minimap, COLOR_MINIMAP_TANK_FRIENDLY, (other_mini_x, other_mini_y), 3)
+                pygame.draw.circle(
+                    minimap,
+                    COLOR_MINIMAP_TANK_FRIENDLY,
+                    (other_mini_x, other_mini_y),
+                    3,
+                )
             elif other_tank in perspective_tank.visible_entities:
                 # Fully visible - solid red square
                 square_size = 6
                 pygame.draw.rect(
                     minimap,
                     COLOR_MINIMAP_TANK_ENEMY,
-                    (other_mini_x - square_size // 2, other_mini_y - square_size // 2, square_size, square_size),
+                    (
+                        other_mini_x - square_size // 2,
+                        other_mini_y - square_size // 2,
+                        square_size,
+                        square_size,
+                    ),
                 )
             else:
                 # Check radar blips for this tank with fade
                 latest_blip = None
-                for blip_entity, timestamp, _angle, snap_x, snap_y, _entity_type in reversed(
+                for (
+                    blip_entity,
+                    timestamp,
+                    _angle,
+                    snap_x,
+                    snap_y,
+                    _entity_type,
+                ) in reversed(
                     perspective_tank.radar_blips,
                 ):
                     if blip_entity == other_tank:
@@ -257,7 +300,9 @@ class MinimapRenderer:
                         square_size = 6
                         blip_mini_x = int(snap_x * scale + offset_x)
                         blip_mini_y = int(snap_y * scale + offset_y)
-                        temp_surface = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
+                        temp_surface = pygame.Surface(
+                            (square_size, square_size), pygame.SRCALPHA
+                        )
                         faded_color = (*COLOR_MINIMAP_TANK_ENEMY[:3], alpha)
                         pygame.draw.rect(
                             temp_surface,
@@ -266,10 +311,15 @@ class MinimapRenderer:
                         )
                         minimap.blit(
                             temp_surface,
-                            (blip_mini_x - square_size // 2, blip_mini_y - square_size // 2),
+                            (
+                                blip_mini_x - square_size // 2,
+                                blip_mini_y - square_size // 2,
+                            ),
                         )
 
-    def _draw_perspective_tank(self, minimap: pygame.Surface, tank: "Tank", mini_x: int, mini_y: int) -> None:
+    def _draw_perspective_tank(
+        self, minimap: pygame.Surface, tank: "Tank", mini_x: int, mini_y: int
+    ) -> None:
         """Draw the perspective tank with heading indicator on minimap.
 
         Args:
@@ -280,13 +330,17 @@ class MinimapRenderer:
 
         """
         tank_size = 5
-        pygame.draw.circle(minimap, COLOR_MINIMAP_TANK_FRIENDLY, (mini_x, mini_y), tank_size)
+        pygame.draw.circle(
+            minimap, COLOR_MINIMAP_TANK_FRIENDLY, (mini_x, mini_y), tank_size
+        )
 
         # Draw heading indicator
         angle_rad = math.radians(tank.turret_angle)
         end_x = int(mini_x + math.cos(angle_rad) * tank_size * 2)
         end_y = int(mini_y + math.sin(angle_rad) * tank_size * 2)
-        pygame.draw.line(minimap, COLOR_MINIMAP_TANK_FRIENDLY, (mini_x, mini_y), (end_x, end_y), 2)
+        pygame.draw.line(
+            minimap, COLOR_MINIMAP_TANK_FRIENDLY, (mini_x, mini_y), (end_x, end_y), 2
+        )
 
     def _draw_radar_blips(
         self,
@@ -327,18 +381,30 @@ class MinimapRenderer:
             entity_mini_y = int(snap_y * scale + offset_y)
 
             # Determine color by entity type (from snapshot)
-            color = COLOR_RADAR_BLIP_MINE if entity_type == "Mine" else COLOR_RADAR_BLIP_TANK
+            color = (
+                COLOR_RADAR_BLIP_MINE
+                if entity_type == "Mine"
+                else COLOR_RADAR_BLIP_TANK
+            )
 
             # Calculate fade
             fade_progress = age / RADAR_BLIP_FADE_TIME
             alpha = int(255 * (1.0 - fade_progress))
 
             # Draw fading dot
-            pulse_scale = 1.0 + 0.2 * math.sin(tank.radar_sweep_angle * math.pi / 180 * 4)
+            pulse_scale = 1.0 + 0.2 * math.sin(
+                tank.radar_sweep_angle * math.pi / 180 * 4
+            )
             blip_size = int(2 * pulse_scale)
 
             # Create temporary surface for alpha blending
-            temp_surface = pygame.Surface((blip_size * 2, blip_size * 2), pygame.SRCALPHA)
+            temp_surface = pygame.Surface(
+                (blip_size * 2, blip_size * 2), pygame.SRCALPHA
+            )
             faded_color = (*color[:3], alpha)
-            pygame.draw.circle(temp_surface, faded_color, (blip_size, blip_size), blip_size)
-            minimap.blit(temp_surface, (entity_mini_x - blip_size, entity_mini_y - blip_size))
+            pygame.draw.circle(
+                temp_surface, faded_color, (blip_size, blip_size), blip_size
+            )
+            minimap.blit(
+                temp_surface, (entity_mini_x - blip_size, entity_mini_y - blip_size)
+            )

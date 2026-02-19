@@ -78,13 +78,17 @@ class RenderPipeline:
 
         # Layer 2.8-2.9: Radar and minimap
         if context.perspective_tank and context.settings.show_radar_blips:
-            self._radar_renderer.render_blips(context.perspective_tank, context.current_time)
+            self._radar_renderer.render_blips(
+                context.perspective_tank, context.current_time
+            )
 
         if context.settings.show_radar_blips:
             self._radar_renderer.render_jamming_effects(context.game_state.tanks)
 
         if context.perspective_tank and context.settings.show_minimap:
-            self._minimap_renderer.render(context.game_state, context.perspective_tank, context.current_time)
+            self._minimap_renderer.render(
+                context.game_state, context.perspective_tank, context.current_time
+            )
 
         # Layer 3: Debug and HUD
         self._render_debug_and_hud(context)
@@ -104,8 +108,12 @@ class RenderPipeline:
                 context.observer_hidden_alpha,
             )
         elif context.perspective_tank:
-            self._bullet_renderer.render_visible(context.game_state.bullets, context.perspective_tank)
-            self._tank_renderer.render_visible(context.game_state.tanks, context.perspective_tank)
+            self._bullet_renderer.render_visible(
+                context.game_state.bullets, context.perspective_tank
+            )
+            self._tank_renderer.render_visible(
+                context.game_state.tanks, context.perspective_tank
+            )
         else:
             self._bullet_renderer.render_all(context.game_state.bullets)
             self._tank_renderer.render_all(context.game_state.tanks)
@@ -118,7 +126,10 @@ class RenderPipeline:
 
         """
         if context.observer_tanks:
-            fog_colors = context.observer_fog_colors or ((80, 120, 255), (255, 120, 120))
+            fog_colors = context.observer_fog_colors or (
+                (80, 120, 255),
+                (255, 120, 120),
+            )
             for index, tank in enumerate(context.observer_tanks):
                 if tank.fog_memory:
                     color = fog_colors[index % len(fog_colors)]
@@ -129,7 +140,9 @@ class RenderPipeline:
                         opacity_scale=context.observer_fog_opacity,
                     )
         elif context.perspective_tank and context.perspective_tank.fog_memory:
-            self._fog_renderer.render(context.game_state.game_map, context.perspective_tank)
+            self._fog_renderer.render(
+                context.game_state.game_map, context.perspective_tank
+            )
 
     def _render_debug_and_hud(self, context: RenderContext) -> None:
         """Render debug overlays and HUD elements.

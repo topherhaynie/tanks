@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from tanks.config.constants import COLOR_FOG, FOG_GRADIENT_SCALE, FOG_TILE_SIZE, TILE_SIZE
+from tanks.config.constants import (
+    COLOR_FOG,
+    FOG_GRADIENT_SCALE,
+    FOG_TILE_SIZE,
+    TILE_SIZE,
+)
 
 if TYPE_CHECKING:
     from tanks.entities.tank import Tank
@@ -65,7 +70,9 @@ class FogRenderer:
         # First pass: Draw solid fog tiles for unrevealed areas
         for x, y in context.iter_coords():
             if not context.is_revealed(x, y):
-                fog_rect = pygame.Rect(x * FOG_TILE_SIZE, y * FOG_TILE_SIZE, FOG_TILE_SIZE, FOG_TILE_SIZE)
+                fog_rect = pygame.Rect(
+                    x * FOG_TILE_SIZE, y * FOG_TILE_SIZE, FOG_TILE_SIZE, FOG_TILE_SIZE
+                )
                 pygame.draw.rect(fog_surface, fog_color, fog_rect)
 
         # Second pass: Add smooth gradient at fog edges
@@ -73,7 +80,9 @@ class FogRenderer:
 
         self._screen.blit(fog_surface, (0, 0))
 
-    def _get_fog_gradient_stamp(self, fog_color: tuple[int, int, int, int]) -> pygame.Surface:
+    def _get_fog_gradient_stamp(
+        self, fog_color: tuple[int, int, int, int]
+    ) -> pygame.Surface:
         """Get a cached fog gradient stamp for a given color.
 
         Returns:

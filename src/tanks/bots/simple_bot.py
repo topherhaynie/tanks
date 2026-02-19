@@ -56,7 +56,9 @@ def _select_nearest_enemy(state: BotState) -> VisibleEntity | None:
     return best
 
 
-def _attack_target(state: BotState, target: VisibleEntity, aim_noise: float) -> BotAction:
+def _attack_target(
+    state: BotState, target: VisibleEntity, aim_noise: float
+) -> BotAction:
     dx = target.x - state.self_state.x
     dy = target.y - state.self_state.y
     desired_angle = math.atan2(dy, dx) + aim_noise

@@ -33,7 +33,12 @@ class BulletRenderer:
             if not bullet.active:
                 continue
 
-            pygame.draw.circle(self._screen, COLOR_BULLET, (int(bullet.x), int(bullet.y)), bullet.radius)
+            pygame.draw.circle(
+                self._screen,
+                COLOR_BULLET,
+                (int(bullet.x), int(bullet.y)),
+                bullet.radius,
+            )
 
     def render_visible(self, bullets: list, perspective_tank: "Tank") -> None:
         """Render bullets visible to the perspective tank.
@@ -48,4 +53,9 @@ class BulletRenderer:
                 continue
 
             if bullet in perspective_tank.visible_entities:
-                pygame.draw.circle(self._screen, COLOR_BULLET, (int(bullet.x), int(bullet.y)), bullet.radius)
+                pygame.draw.circle(
+                    self._screen,
+                    COLOR_BULLET,
+                    (int(bullet.x), int(bullet.y)),
+                    bullet.radius,
+                )

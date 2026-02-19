@@ -3,7 +3,11 @@
 import math
 
 from ..config.constants import TILE_SIZE
-from ..utils.geometry import circle_circle_collision, closest_point_on_line, line_circle_intersection
+from ..utils.geometry import (
+    circle_circle_collision,
+    closest_point_on_line,
+    line_circle_intersection,
+)
 
 
 class CollisionSystem:
@@ -95,7 +99,9 @@ class CollisionSystem:
                 swept_point = None
 
                 # Only do swept check if bullet moved significantly
-                move_dist_sq = (bullet.x - bullet.prev_x) ** 2 + (bullet.y - bullet.prev_y) ** 2
+                move_dist_sq = (bullet.x - bullet.prev_x) ** 2 + (
+                    bullet.y - bullet.prev_y
+                ) ** 2
                 if move_dist_sq > 0.01:
                     hit_swept, swept_point = line_line_intersection(
                         bullet.prev_x,

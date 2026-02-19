@@ -28,19 +28,35 @@ class DebugRenderer:
         """
         for tank in game_state.tanks:
             if tank.active:
-                pygame.draw.circle(self._screen, COLOR_DEBUG_HITBOX, (int(tank.x), int(tank.y)), tank.radius, 1)
+                pygame.draw.circle(
+                    self._screen,
+                    COLOR_DEBUG_HITBOX,
+                    (int(tank.x), int(tank.y)),
+                    tank.radius,
+                    1,
+                )
 
         for bullet in game_state.bullets:
             if bullet.active:
-                pygame.draw.circle(self._screen, COLOR_DEBUG_HITBOX, (int(bullet.x), int(bullet.y)), bullet.radius, 1)
+                pygame.draw.circle(
+                    self._screen,
+                    COLOR_DEBUG_HITBOX,
+                    (int(bullet.x), int(bullet.y)),
+                    bullet.radius,
+                    1,
+                )
 
     @staticmethod
-    def draw_vision_cone(screen: pygame.Surface, tank: Any, radius: int, color: tuple[int, int, int]) -> None:
+    def draw_vision_cone(
+        screen: pygame.Surface, tank: Any, radius: int, color: tuple[int, int, int]
+    ) -> None:
         """Draw vision cone overlay."""
         pygame.draw.circle(screen, color, (int(tank.x), int(tank.y)), radius, 1)
 
     @staticmethod
-    def draw_radar_overlay(screen: pygame.Surface, tank: Any, radius: int, color: tuple[int, int, int]) -> None:
+    def draw_radar_overlay(
+        screen: pygame.Surface, tank: Any, radius: int, color: tuple[int, int, int]
+    ) -> None:
         """Draw radar range overlay."""
         pygame.draw.circle(screen, color, (int(tank.x), int(tank.y)), radius, 1)
 
