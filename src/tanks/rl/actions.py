@@ -196,9 +196,15 @@ class ContinuousActionSpace(ActionSpace):
     - place_mine: shoot_confidence > 0.9 and mine ready
     """
 
-    def __init__(self) -> None:
-        """Initialize continuous action space."""
+    def __init__(self, auto_aim: bool = True) -> None:
+        """Initialize continuous action space.
+
+        Args:
+            auto_aim: If True, turret auto-aim is handled by environment.
+
+        """
         self.num_dimensions = 4
+        self.auto_aim = auto_aim
 
     def sample(self) -> np.ndarray:
         """Sample a random continuous action."""
@@ -217,15 +223,16 @@ class ContinuousActionSpace(ActionSpace):
         move_speed = float(np.clip(action[0], -1.0, 1.0))
         turn_rate = float(np.clip(action[1], -1.0, 1.0))
         turret_delta = float(np.clip(action[2], -1.0, 1.0))
-        shoot_confidence = float(np.clip(action[3], 0.0, 1.0))
+        shoot_signal = float(np.clip(action[3], -1.0, 1.0))
+        shoot_confidence = (shoot_signal + 1.0) * 0.5
 
         # Convert continuous values to discrete flags
         move_forward = move_speed > 0.1
         move_backward = move_speed < -0.1
         turn_left = turn_rate < -0.1
         turn_right = turn_rate > 0.1
-        turret_left = turret_delta < -0.1
-        turret_right = turret_delta > 0.1
+        turret_left = (turret_delta < -0.1) and not self.auto_aim
+        turret_right = (turret_delta > 0.1) and not self.auto_aim
 
         # Shooting thresholds
         shoot = shoot_confidence > 0.5

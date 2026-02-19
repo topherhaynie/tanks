@@ -60,8 +60,10 @@ class TrainingEnvironment:
         if map_config is None:
             # Default: simple arena
             self.game_map = MapLoader.create_simple_arena(20, 11)
+        elif "map" in map_config:
+            # Explicit map object provided by generator
+            self.game_map = map_config["map"]
         else:
-            # TODO: support custom map configs
             self.game_map = MapLoader.create_simple_arena(
                 map_config.get("width", 20),
                 map_config.get("height", 11),
@@ -102,6 +104,21 @@ class TrainingEnvironment:
         self.current_step = 0
         self.input_tick_id = 0
         self.episode_count = 0
+
+    def set_game_map(self, game_map) -> None:
+        """Set a new map and refresh dependent systems.
+
+        Args:
+            game_map: New map object to use.
+
+        """
+        self.game_map = game_map
+        self.collision_system = CollisionSystem(self.game_map)
+        self.vision_system = VisionSystem(self.game_map)
+
+        map_width, map_height = self.game_map.get_pixel_size()
+        self.state_encoder.max_map_width = float(map_width)
+        self.state_encoder.max_map_height = float(map_height)
 
     def reset(self) -> np.ndarray:
         """Reset environment for new episode.
@@ -182,11 +199,7 @@ class TrainingEnvironment:
             self._apply_bot_action(self.agent_tank, bot_action)
 
         # Update opponent bot
-        if (
-            self.opponent_controller
-            and self.opponent_tank
-            and self.opponent_tank.active
-        ):
+        if self.opponent_controller and self.opponent_tank and self.opponent_tank.active:
             self.opponent_controller.update(1.0 / INPUT_RATE)
 
         # Step physics multiple times per input
@@ -265,7 +278,8 @@ class TrainingEnvironment:
 
             # Remove inactive
             if not bullet.active:
-                self.bullets.remove(bullet)
+                if bullet in self.bullets:
+                    self.bullets.remove(bullet)
 
         # Update missiles
         for missile in self.missiles[:]:
@@ -301,7 +315,8 @@ class TrainingEnvironment:
                     missile.destroy()
 
             if not missile.active:
-                self.missiles.remove(missile)
+                if missile in self.missiles:
+                    self.missiles.remove(missile)
 
         # Update mines
         for mine in self.mines[:]:
@@ -314,11 +329,9 @@ class TrainingEnvironment:
 
             # Check collision with projectiles
             if mine.armed and mine.active:
-                hit_projectile = (
-                    self.collision_system.check_mine_collision_with_projectile(
-                        mine,
-                        self.bullets + self.missiles,
-                    )
+                hit_projectile = self.collision_system.check_mine_collision_with_projectile(
+                    mine,
+                    self.bullets + self.missiles,
                 )
                 if hit_projectile:
                     mine.trigger()
@@ -361,10 +374,8 @@ class TrainingEnvironment:
                                 self.state_encoder.record_kill()
 
                 # Remove inactive mine
-                self.mines.remove(mine)
-
-            if not mine.active:
-                self.mines.remove(mine)
+                if mine in self.mines:
+                    self.mines.remove(mine)
 
         # Handle shooting from tanks
         for tank in self.tanks:
@@ -386,6 +397,9 @@ class TrainingEnvironment:
                     # Track shot for reward
                     if tank == self.agent_tank:
                         self.state_encoder.record_shot_fired()
+                        self.reward_calculator.record_shot(
+                            enemy_visible=self._has_visible_enemy(tank),
+                        )
 
             # Check missile
             if hasattr(tank, "_wants_missile") and tank._wants_missile:
@@ -401,6 +415,9 @@ class TrainingEnvironment:
                     self.missiles.append(missile)
                     if tank == self.agent_tank:
                         self.state_encoder.record_shot_fired()
+                        self.reward_calculator.record_shot(
+                            enemy_visible=self._has_visible_enemy(tank),
+                        )
 
             # Check mine
             if hasattr(tank, "_wants_mine") and tank._wants_mine:
@@ -414,18 +431,12 @@ class TrainingEnvironment:
         # Apply movement
         for tank in self.tanks:
             if tank.active:
-                # Get movement flags (set by _apply_bot_action)
-                move_forward = getattr(tank, "_move_forward", False)
-                move_backward = getattr(tank, "_move_backward", False)
-                turn_left = getattr(tank, "_turn_left", False)
-                turn_right = getattr(tank, "_turn_right", False)
-
                 self.movement_system.update_tank_movement(
                     tank,
-                    move_forward,
-                    move_backward,
-                    turn_left,
-                    turn_right,
+                    getattr(tank, "move_forward", False),
+                    getattr(tank, "move_backward", False),
+                    getattr(tank, "turn_left", False),
+                    getattr(tank, "turn_right", False),
                     dt,
                 )
                 # TODO: Add proper collision resolution if needed
@@ -469,10 +480,7 @@ class TrainingEnvironment:
         tank._wants_mine = action.place_mine
 
         # Auto-aim turret if enabled
-        if (
-            isinstance(self.action_space, DiscreteActionSpace)
-            and self.action_space.auto_aim
-        ):
+        if getattr(self.action_space, "auto_aim", False):
             self._auto_aim_turret(tank)
 
     def _auto_aim_turret(self, tank: Tank) -> None:
@@ -482,11 +490,7 @@ class TrainingEnvironment:
             tank: Tank to aim.
 
         """
-        enemies = [
-            e
-            for e in tank.visible_entities
-            if hasattr(e, "team") and e.team != tank.team and e.active
-        ]
+        enemies = [e for e in tank.visible_entities if hasattr(e, "team") and e.team != tank.team and e.active]
 
         if enemies:
             nearest = min(enemies, key=lambda e: math.hypot(e.x - tank.x, e.y - tank.y))
@@ -497,6 +501,20 @@ class TrainingEnvironment:
 
             # Set turret to aim at enemy
             tank.turret_angle = target_angle
+
+    def _has_visible_enemy(self, tank: Tank) -> bool:
+        """Check if the tank currently sees at least one active enemy tank.
+
+        Args:
+            tank: Tank to evaluate visibility for.
+
+        Returns:
+            True when at least one enemy tank is visible.
+
+        """
+        return any(
+            hasattr(entity, "team") and entity.team != tank.team and entity.active for entity in tank.visible_entities
+        )
 
     def _get_observation(self) -> np.ndarray:
         """Get current observation (state vector).
@@ -581,9 +599,7 @@ class TrainingEnvironment:
         info: dict = {
             "step": self.current_step,
             "agent_alive": self.agent_tank.active if self.agent_tank else False,
-            "opponent_alive": self.opponent_tank.active
-            if self.opponent_tank
-            else False,
+            "opponent_alive": self.opponent_tank.active if self.opponent_tank else False,
             "agent_hp": self.agent_tank.hp if self.agent_tank else 0,
             "opponent_hp": self.opponent_tank.hp if self.opponent_tank else 0,
         }
@@ -591,9 +607,7 @@ class TrainingEnvironment:
         # Check victory/defeat conditions
         if self.agent_tank and self.opponent_tank:
             info["agent_won"] = not self.opponent_tank.active and self.agent_tank.active
-            info["agent_killed_opponent"] = (
-                not self.opponent_tank.active and self.agent_tank.active
-            )
+            info["agent_killed_opponent"] = not self.opponent_tank.active and self.agent_tank.active
 
         return info
 

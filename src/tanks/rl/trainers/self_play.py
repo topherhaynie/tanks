@@ -5,6 +5,7 @@ Maintains an opponent pool and periodically adds snapshots for diversity.
 """
 
 import random
+import sys
 from typing import Any
 
 import numpy as np
@@ -73,6 +74,8 @@ class SelfPlayTrainer:
         self.losses: list[float] = []
         self.opponent_versions: list[int] = []
         self.current_opponent_version = 0
+        self._prev_log_metrics: dict[str, float] | None = None
+        self._regression_streak = 0
 
         # Episode manager
         self.episode_manager = EpisodeManager()
@@ -112,6 +115,9 @@ class SelfPlayTrainer:
                 desc="Self-play",
                 unit="ep",
                 ncols=100,
+                dynamic_ncols=True,
+                file=sys.stdout,
+                disable=not sys.stdout.isatty(),
             )
 
         for episode in range(num_episodes):
@@ -274,7 +280,7 @@ class SelfPlayTrainer:
             self.total_steps += 1
 
         # Check if won
-        won = info.get("won", False)
+        won = info.get("agent_won", info.get("won", False))
 
         if isinstance(self.agent, PPOAgent) and ppo_states:
             states = np.asarray(ppo_states, dtype=np.float32)
@@ -366,6 +372,8 @@ class SelfPlayTrainer:
         avg_length = np.mean(recent_lengths)
         win_rate = np.mean(recent_wins)
         avg_loss = np.mean(recent_losses) if recent_losses else 0.0
+        warning = self._update_collapse_watch(avg_reward, win_rate, avg_length)
+        warning_line = f"{warning}\n" if warning else ""
 
         # Format message
         msg = (
@@ -374,6 +382,7 @@ class SelfPlayTrainer:
             f"Avg Reward: {avg_reward:+.2f} | Win Rate: {win_rate:.1%}\n"
             f"Avg Length: {avg_length:.0f} | Avg Loss: {avg_loss:.4f}\n"
             f"Opponent Pool: {self.checkpoint_manager.get_opponent_count()}\n"
+            f"{warning_line}"
             f"{'=' * 80}\n"
         )
 
@@ -381,6 +390,54 @@ class SelfPlayTrainer:
             pbar.write(msg)
         else:
             print(msg)
+
+    def _update_collapse_watch(
+        self,
+        avg_reward: float,
+        win_rate: float,
+        avg_length: float,
+    ) -> str | None:
+        """Track consecutive regressions and return warning text when detected.
+
+        Args:
+            avg_reward: Current logging-window average reward.
+            win_rate: Current logging-window win rate.
+            avg_length: Current logging-window average episode length.
+
+        Returns:
+            Warning string when collapse pattern is detected, otherwise None.
+
+        """
+        if self._prev_log_metrics is None:
+            self._prev_log_metrics = {
+                "avg_reward": avg_reward,
+                "win_rate": win_rate,
+                "avg_length": avg_length,
+            }
+            return None
+
+        reward_drop = avg_reward <= self._prev_log_metrics["avg_reward"] - 10.0
+        win_drop = win_rate <= self._prev_log_metrics["win_rate"] - 0.10
+        length_rise = avg_length >= self._prev_log_metrics["avg_length"] + 120.0
+
+        if win_drop and (reward_drop or length_rise):
+            self._regression_streak += 1
+        else:
+            self._regression_streak = 0
+
+        self._prev_log_metrics = {
+            "avg_reward": avg_reward,
+            "win_rate": win_rate,
+            "avg_length": avg_length,
+        }
+
+        if self._regression_streak >= 2:
+            return (
+                "⚠️  Collapse watch: 2+ consecutive regressions detected "
+                "(win/reward down, length up). Consider lowering PPO lr/clip or restarting stage."
+            )
+
+        return None
 
     def _print_final_stats(self) -> None:
         """Print final training statistics."""

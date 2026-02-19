@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+from pathlib import Path
 
 import torch
 
@@ -29,6 +30,9 @@ def parse_args():
 Examples:
   # Train DQN agent through full regime (default)
   python -m tanks.scripts.train_regime --agent dqn
+
+    # Non-interactive start (for overnight runs)
+    python -m tanks.scripts.train_regime --agent dqn --config regime_m4_competitive.json --yes
   
   # Train PPO agent, skip survival phase
   python -m tanks.scripts.train_regime --agent ppo --skip-phase-c
@@ -38,6 +42,9 @@ Examples:
   
   # Resume from checkpoint
   python -m tanks.scripts.train_regime --agent dqn --resume checkpoints/regime/phase_a/checkpoints/latest_model.pt
+
+    # Resume from most recent checkpoint under checkpoint dir
+    python -m tanks.scripts.train_regime --agent dqn --checkpoint-dir checkpoints/regime --resume-latest
   
   # Load regime config from JSON
   python -m tanks.scripts.train_regime --agent ppo --config my_regime.json
@@ -58,6 +65,12 @@ Examples:
         type=str,
         default=None,
         help="Resume from checkpoint path",
+    )
+
+    parser.add_argument(
+        "--resume-latest",
+        action="store_true",
+        help="Auto-resume from most recent checkpoint under --checkpoint-dir",
     )
 
     # Regime configuration
@@ -114,6 +127,13 @@ Examples:
         type=int,
         default=200,
         help="Episodes per survival stage (default: 200)",
+    )
+
+    parser.add_argument(
+        "--max-steps-per-episode",
+        type=int,
+        default=3000,
+        help="Maximum environment steps per episode (default: 3000)",
     )
 
     # Reward tuning
@@ -213,6 +233,12 @@ Examples:
         help="Suppress verbose output",
     )
 
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Start immediately without confirmation prompt",
+    )
+
     return parser.parse_args()
 
 
@@ -276,6 +302,7 @@ def create_regime_config(args) -> dict:
         "phase_a_enabled": not args.skip_phase_a,
         "phase_b_enabled": not args.skip_phase_b,
         "phase_c_enabled": not args.skip_phase_c,
+        "max_steps_per_episode": args.max_steps_per_episode,
         "phase_a_episodes_per_stage": args.episodes_per_stage,
         "phase_b_episodes": args.phase_b_episodes,
         "phase_c_episodes_per_stage": args.phase_c_episodes,
@@ -285,7 +312,72 @@ def create_regime_config(args) -> dict:
     }
 
 
-def create_agent(args, device: torch.device) -> DQNAgent | PPOAgent:
+def resolve_resume_checkpoint(args) -> str | None:
+    """Resolve checkpoint path to resume from.
+
+    Priority:
+    1) Explicit --resume path (if provided)
+    2) Auto-detected newest checkpoint if --resume-latest is set
+
+    Args:
+        args: Parsed command line arguments.
+
+    Returns:
+        Resolved checkpoint path, or None when starting fresh.
+
+    Raises:
+        ValueError: If resume options conflict or no checkpoint is found.
+
+    """
+    if args.resume and args.resume_latest:
+        msg = "Use only one of --resume or --resume-latest"
+        raise ValueError(msg)
+
+    if args.resume:
+        checkpoint_path = Path(args.resume)
+        if not checkpoint_path.exists():
+            msg = f"Checkpoint not found: {checkpoint_path}"
+            raise ValueError(msg)
+        return str(checkpoint_path)
+
+    if not args.resume_latest:
+        return None
+
+    checkpoint_dir = Path(args.checkpoint_dir)
+    if not checkpoint_dir.exists():
+        msg = f"Checkpoint directory not found: {checkpoint_dir}"
+        raise ValueError(msg)
+
+    candidates: list[Path] = []
+    candidates.extend(checkpoint_dir.rglob("latest_model.pt"))
+    candidates.extend(checkpoint_dir.rglob("best_model.pt"))
+
+    if not candidates:
+        msg = f"No checkpoints found under: {checkpoint_dir}"
+        raise ValueError(msg)
+
+    def is_compatible(path: Path) -> bool:
+        try:
+            checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        except Exception:
+            return False
+
+        if args.agent == "dqn":
+            return "policy_net_state_dict" in checkpoint and "target_net_state_dict" in checkpoint
+
+        return "network_state_dict" in checkpoint
+
+    compatible_candidates = [path for path in candidates if is_compatible(path)]
+
+    if not compatible_candidates:
+        msg = f"No {args.agent.upper()}-compatible checkpoints found under: {checkpoint_dir}"
+        raise ValueError(msg)
+
+    newest = max(compatible_candidates, key=lambda path: path.stat().st_mtime)
+    return str(newest)
+
+
+def create_agent(args, device: torch.device, resume_checkpoint: str | None = None) -> DQNAgent | PPOAgent:
     """Create agent from command line args.
 
     Args:
@@ -296,14 +388,14 @@ def create_agent(args, device: torch.device) -> DQNAgent | PPOAgent:
         Initialized agent (DQN or PPO).
 
     """
-    if args.resume:
+    if resume_checkpoint:
         # Load from checkpoint
         if args.agent == "dqn":
-            agent = DQNAgent.load(args.resume, device=device.type)
+            agent = DQNAgent.load(resume_checkpoint, device=device.type)
         else:
-            agent = PPOAgent.load(args.resume, device=device.type)
+            agent = PPOAgent.load(resume_checkpoint, device=device.type)
 
-        print(f"Resumed agent from: {args.resume}")
+        print(f"Resumed agent from: {resume_checkpoint}")
         return agent
 
     # Create new agent
@@ -329,7 +421,7 @@ def create_agent(args, device: torch.device) -> DQNAgent | PPOAgent:
             device=device.type,
         )
         print(
-            f"Created new PPO agent (lr={args.ppo_lr}, gamma={args.ppo_gamma}, clip={args.ppo_clip}, device={device})"
+            f"Created new PPO agent (lr={args.ppo_lr}, gamma={args.ppo_gamma}, clip={args.ppo_clip}, device={device})",
         )
 
     return agent
@@ -347,8 +439,15 @@ def main():
     # Setup training device
     device = setup_device(args.device)
 
+    # Resolve resume checkpoint (explicit path or auto-detected latest)
+    try:
+        resume_checkpoint = resolve_resume_checkpoint(args)
+    except ValueError as error:
+        print(f"Error: {error}")
+        return
+
     # Create agent
-    agent = create_agent(args, device)
+    agent = create_agent(args, device, resume_checkpoint)
 
     # Create regime config
     regime_config = create_regime_config(args)
@@ -379,10 +478,13 @@ def main():
     print("\n" + "=" * 80 + "\n")
 
     # Confirm start
-    response = input("Start training regime? [y/N]: ")
-    if response.lower() != "y":
-        print("Training cancelled.")
-        return
+    if not args.yes:
+        response = input("Start training regime? [y/N]: ")
+        if response.lower() != "y":
+            print("Training cancelled.")
+            return
+    else:
+        print("Auto-confirm enabled (--yes). Starting training...")
 
     # Create orchestrator
     orchestrator = TrainingOrchestrator(
@@ -393,7 +495,12 @@ def main():
     )
 
     # Run full regime
-    orchestrator.run_full_regime()
+    try:
+        orchestrator.run_full_regime()
+    except KeyboardInterrupt:
+        print("\nTraining interrupted by user (Ctrl+C).")
+        print("Recent periodic checkpoints remain in your checkpoint directory.")
+        return
 
     # Final summary
     print("\n" + "=" * 80)

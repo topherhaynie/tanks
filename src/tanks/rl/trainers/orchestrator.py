@@ -8,6 +8,7 @@ Coordinates the full training pipeline:
 """
 
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -68,6 +69,7 @@ class TrainingOrchestrator:
             "phase_a_enabled": True,  # Map-specific curriculum
             "phase_b_enabled": True,  # Random map self-play
             "phase_c_enabled": True,  # Survival training
+            "max_steps_per_episode": 3000,
             "phase_a_episodes_per_stage": 150,
             "phase_b_episodes": 500,
             "phase_c_episodes_per_stage": 200,
@@ -170,7 +172,7 @@ class TrainingOrchestrator:
             # Create environment with exploration-focused rewards
             env = TrainingEnvironment(
                 map_config={"map": game_map},
-                max_steps=3000,
+                max_steps=self.config["max_steps_per_episode"],
                 action_space=self._get_action_space(),
                 opponent_bot=SmartBot() if use_bot_opponent else None,  # None triggers opponent pool
                 reward_calculator=self._create_exploration_rewards(),
@@ -188,6 +190,7 @@ class TrainingOrchestrator:
             # Train
             metrics = trainer.train(
                 max_episodes=self.config["phase_a_episodes_per_stage"],
+                max_steps_per_episode=self.config["max_steps_per_episode"],
                 save_interval=self.config["save_interval"],
             )
 
@@ -197,7 +200,7 @@ class TrainingOrchestrator:
                     "episodes": len(metrics["episode_rewards"]),
                     "avg_reward": float(np.mean(metrics["episode_rewards"])),
                     "win_rate": float(np.mean(metrics["episode_wins"])),
-                }
+                },
             )
 
             self.total_episodes += len(metrics["episode_rewards"])
@@ -234,7 +237,7 @@ class TrainingOrchestrator:
         # We'll regenerate the map each episode using different configs
         env = TrainingEnvironment(
             map_config=None,
-            max_steps=3000,
+            max_steps=self.config["max_steps_per_episode"],
             action_space=self._get_action_space(),
             opponent_bot=None,  # Pure self-play using opponent pool
             reward_calculator=self._create_exploration_rewards(),
@@ -266,7 +269,7 @@ class TrainingOrchestrator:
                 max_density=0.35,
             )
             map_generator = MapGenerator(config)
-            env.game_map = map_generator.generate()
+            env.set_game_map(map_generator.generate())
             return original_reset()
 
         env.reset = random_map_reset
@@ -274,6 +277,7 @@ class TrainingOrchestrator:
         # Train
         metrics = trainer.train(
             num_episodes=self.config["phase_b_episodes"],
+            max_steps_per_episode=self.config["max_steps_per_episode"],
             save_interval=self.config["save_interval"],
         )
 
@@ -317,7 +321,7 @@ class TrainingOrchestrator:
                 (SURVIVAL_SMALL_SPEC, 2),
                 (SURVIVAL_MEDIUM_SPEC, 2),
                 (SURVIVAL_EXTREME_SPEC, 3),
-            ]
+            ],
         ):
             self._log(f"\n{'=' * 80}")
             self._log(f"Survival Stage {i + 1}/3: 1v{num_opponents} - {map_spec.name}")
@@ -336,7 +340,7 @@ class TrainingOrchestrator:
                 num_opponents=num_opponents,
                 opponent_bots=opponent_bots,
                 map_generator_config=map_spec.config,
-                max_steps=3000,
+                max_steps=self.config["max_steps_per_episode"],
                 action_space=self._get_action_space(),
                 reward_calculator=self._create_survival_rewards(),
             )
@@ -350,6 +354,7 @@ class TrainingOrchestrator:
                 checkpoint_mgr=checkpoint_mgr,
                 episodes=self.config["phase_c_episodes_per_stage"],
                 stage_name=map_spec.name,
+                max_steps=self.config["max_steps_per_episode"],
             )
 
             stage_results.append(
@@ -360,7 +365,7 @@ class TrainingOrchestrator:
                     "avg_reward": float(np.mean(metrics["episode_rewards"])),
                     "win_rate": float(np.mean(metrics["episode_wins"])),
                     "avg_survival_time": float(np.mean(metrics.get("survival_times", [0]))),
-                }
+                },
             )
 
             self.total_episodes += len(metrics["episode_rewards"])
@@ -378,6 +383,7 @@ class TrainingOrchestrator:
         checkpoint_mgr: CheckpointManager,
         episodes: int,
         stage_name: str,
+        max_steps: int,
     ) -> dict[str, Any]:
         """Train in survival scenario.
 
@@ -400,7 +406,15 @@ class TrainingOrchestrator:
         if isinstance(self.agent, DQNAgent):
             replay_buffer = ReplayBuffer(capacity=100_000, state_dim=self.agent.state_dim)
 
-        pbar = tqdm(range(episodes), desc=f"Survival: {stage_name}", unit="ep", ncols=100)
+        pbar = tqdm(
+            range(episodes),
+            desc=f"Survival: {stage_name}",
+            unit="ep",
+            ncols=100,
+            dynamic_ncols=True,
+            file=sys.stdout,
+            disable=not sys.stdout.isatty(),
+        )
 
         for episode in pbar:
             state = env.reset()
@@ -414,7 +428,7 @@ class TrainingOrchestrator:
             ppo_rewards: list[float] = []
             ppo_dones: list[bool] = []
 
-            while not done and steps < 3000:
+            while not done and steps < max_steps:
                 if isinstance(self.agent, DQNAgent):
                     action = self.agent.select_action(state)
                 else:
@@ -476,7 +490,7 @@ class TrainingOrchestrator:
                 {
                     "win_rate": f"{recent_win_rate:.1%}",
                     "survival": f"{recent_survival:.1f}s",
-                }
+                },
             )
 
             # Save checkpoint periodically
@@ -501,11 +515,19 @@ class TrainingOrchestrator:
         """Create reward calculator with boosted exploration."""
         weights = RewardWeights(
             kill=100.0,
-            death=-100.0,
-            bullet_hit=10.0,
-            survival_per_second=0.1,
-            standing_still_penalty=-1.0,
-            new_terrain_revealed=self.config["exploration_weight"],  # Boosted!
+            death=-70.0,
+            bullet_hit=12.0,
+            survival_per_second=0.05,
+            facing_enemy=2.0,
+            standing_still_penalty=-0.1,
+            standing_still_threshold_steps=120,
+            movement_progress=0.12,
+            approach_visible_enemy=0.35,
+            approach_radar_enemy=0.18,
+            new_terrain_revealed=self.config["exploration_weight"],
+            enemy_spotted=10.0,
+            shot_with_enemy_visible=1.2,
+            shot_without_enemy_visible=-0.05,
         )
 
         return RewardCalculator(weights=weights, enable_shaping=True)

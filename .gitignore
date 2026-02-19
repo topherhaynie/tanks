@@ -201,6 +201,9 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Training runtime artifacts
+checkpoints/regime/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

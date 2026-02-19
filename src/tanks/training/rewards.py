@@ -3,6 +3,7 @@
 Defines reward shaping and calculation for training RL agents.
 """
 
+import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -36,7 +37,14 @@ class RewardWeights:
     good_cover: float = 2.0  # Being near cover
     facing_enemy: float = 1.0  # Facing visible enemy
     standing_still_penalty: float = -0.5  # Encourage movement
+    standing_still_threshold_steps: int = 60  # Delay idle penalty until truly idle
+    movement_progress: float = 0.1  # Reward meaningful movement per step
+    approach_visible_enemy: float = 0.25  # Reward reducing distance to visible enemy
+    approach_radar_enemy: float = 0.12  # Reward reducing distance to radar enemy
     new_terrain_revealed: float = 5.0  # Exploration bonus
+    enemy_spotted: float = 8.0  # One-time bonus for acquiring first visual contact
+    shot_with_enemy_visible: float = 0.5  # Encourage engagement once target found
+    shot_without_enemy_visible: float = -0.1  # Discourage blind spam
     map_center_control: float = 3.0  # Controlling center
     cornered_penalty: float = -2.0  # Being trapped
 
@@ -85,6 +93,9 @@ class RewardCalculator:
         self.prev_position: tuple[float, float] | None = None
         self.prev_explored_area = 0.0
         self.steps_stationary = 0
+        self.enemy_spotted_once = False
+        self.prev_visible_enemy_distance: float | None = None
+        self.prev_radar_enemy_distance: float | None = None
 
     def reset(self) -> None:
         """Reset calculator for new episode."""
@@ -97,6 +108,9 @@ class RewardCalculator:
         self.prev_position = None
         self.prev_explored_area = 0.0
         self.steps_stationary = 0
+        self.enemy_spotted_once = False
+        self.prev_visible_enemy_distance = None
+        self.prev_radar_enemy_distance = None
 
     def compute_step_reward(
         self,
@@ -170,6 +184,18 @@ class RewardCalculator:
         """Record a missed shot for reward tracking."""
         self._add_reward("bullet_wasted", self.weights.bullet_wasted)
 
+    def record_shot(self, enemy_visible: bool) -> None:
+        """Record a shot event with engagement context.
+
+        Args:
+            enemy_visible: Whether at least one enemy tank was visible when firing.
+
+        """
+        if enemy_visible:
+            self._add_reward("engage_visible_enemy", self.weights.shot_with_enemy_visible)
+        else:
+            self._add_reward("blind_fire", self.weights.shot_without_enemy_visible)
+
     def _compute_shaping_rewards(self, state: "BotState") -> None:
         """Compute dense shaping rewards for positioning and strategy.
 
@@ -185,9 +211,7 @@ class RewardCalculator:
             if current_area > self.prev_explored_area:
                 area_delta = current_area - self.prev_explored_area
                 # Normalize delta (1 fog tile = 1 area unit, give bonus per ~10 tiles)
-                exploration_bonus = (
-                    area_delta / 10.0
-                ) * self.weights.new_terrain_revealed
+                exploration_bonus = (area_delta / 10.0) * self.weights.new_terrain_revealed
                 self._add_reward("exploration", exploration_bonus)
             self.prev_explored_area = current_area
 
@@ -195,16 +219,19 @@ class RewardCalculator:
         if self.prev_position is not None:
             dx = s.x - self.prev_position[0]
             dy = s.y - self.prev_position[1]
-            distance_moved = (dx**2 + dy**2) ** 0.5
+            distance_moved = math.hypot(dx, dy)
 
             if distance_moved < 2.0:  # Moved less than 2 pixels
                 self.steps_stationary += 1
-                if self.steps_stationary > 30:  # ~1 second at 30Hz
+                if self.steps_stationary > self.weights.standing_still_threshold_steps:
                     self._add_reward(
-                        "standing_still", self.weights.standing_still_penalty
+                        "standing_still",
+                        self.weights.standing_still_penalty,
                     )
             else:
                 self.steps_stationary = 0
+                movement_bonus = min(distance_moved / 12.0, 1.0) * self.weights.movement_progress
+                self._add_reward("movement_progress", movement_bonus)
 
         self.prev_position = (s.x, s.y)
 
@@ -212,16 +239,12 @@ class RewardCalculator:
         map_center_x = state.map_bounds.width / 2.0
         map_center_y = state.map_bounds.height / 2.0
         dist_to_center = ((s.x - map_center_x) ** 2 + (s.y - map_center_y) ** 2) ** 0.5
-        max_dist = (
-            (state.map_bounds.width / 2.0) ** 2 + (state.map_bounds.height / 2.0) ** 2
-        ) ** 0.5
+        max_dist = ((state.map_bounds.width / 2.0) ** 2 + (state.map_bounds.height / 2.0) ** 2) ** 0.5
 
         # Reward being near center (but not always - only give small bonus)
         if dist_to_center < max_dist * 0.3:  # Within 30% of center
             center_bonus = (
-                (1.0 - dist_to_center / (max_dist * 0.3))
-                * self.weights.map_center_control
-                * 0.1
+                (1.0 - dist_to_center / (max_dist * 0.3)) * self.weights.map_center_control * 0.1
             )  # Small per-step bonus
             self._add_reward("center_control", center_bonus)
 
@@ -236,23 +259,52 @@ class RewardCalculator:
             self._add_reward("cornered", self.weights.cornered_penalty)
 
         # Facing enemy bonus (encourage aiming)
-        enemies = [
-            e
-            for e in state.visible_entities
-            if e.kind == "tank" and e.team != s.team and e.active
-        ]
+        enemies = [e for e in state.visible_entities if e.kind == "tank" and e.team != s.team and e.active]
+        if enemies and not self.enemy_spotted_once:
+            self._add_reward("enemy_spotted", self.weights.enemy_spotted)
+            self.enemy_spotted_once = True
+
         if enemies:
             nearest = min(enemies, key=lambda e: e.distance)
-            # Check if turret is roughly facing enemy (within 30 degrees)
-            import math
+            nearest_distance = float(nearest.distance)
 
+            if self.prev_visible_enemy_distance is not None:
+                distance_delta = self.prev_visible_enemy_distance - nearest_distance
+                if distance_delta > 0.0:
+                    approach_bonus = min(distance_delta / 60.0, 1.0) * self.weights.approach_visible_enemy
+                    self._add_reward("approach_visible_enemy", approach_bonus)
+
+            self.prev_visible_enemy_distance = nearest_distance
+
+            # Check if turret is roughly facing enemy (within 30 degrees)
             turret_to_enemy_diff = abs(nearest.bearing)
             if turret_to_enemy_diff < math.radians(30):
                 facing_bonus = self.weights.facing_enemy * 0.1  # Small per-step bonus
                 self._add_reward("facing_enemy", facing_bonus)
+        else:
+            self.prev_visible_enemy_distance = None
+
+        # Approach bonus from radar when enemy is not currently visible
+        if not enemies:
+            radar_tank_distances = [float(hit.distance) for hit in state.radar_hits if hit.kind == "tank"]
+            if radar_tank_distances:
+                nearest_radar = min(radar_tank_distances)
+                if self.prev_radar_enemy_distance is not None:
+                    radar_delta = self.prev_radar_enemy_distance - nearest_radar
+                    if radar_delta > 0.0:
+                        radar_bonus = min(radar_delta / 120.0, 1.0) * self.weights.approach_radar_enemy
+                        self._add_reward("approach_radar_enemy", radar_bonus)
+                self.prev_radar_enemy_distance = nearest_radar
+            else:
+                self.prev_radar_enemy_distance = None
+        else:
+            self.prev_radar_enemy_distance = None
 
     def _add_reward(
-        self, event_type: str, reward: float, metadata: dict | None = None
+        self,
+        event_type: str,
+        reward: float,
+        metadata: dict | None = None,
     ) -> None:
         """Add a reward event.
 
@@ -268,7 +320,7 @@ class RewardCalculator:
                 event_type=event_type,
                 reward=reward,
                 metadata=metadata or {},
-            )
+            ),
         )
 
     def get_episode_summary(self) -> dict[str, float]:

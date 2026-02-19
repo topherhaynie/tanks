@@ -46,6 +46,12 @@ class Tank(Entity):
 
         # Control (for bots/players)
         self.controller = None  # Will be set to keyboard controller or bot
+        self.move_forward = False
+        self.move_backward = False
+        self.turn_left = False
+        self.turn_right = False
+        self.turret_left = False
+        self.turret_right = False
 
         # Perception (filled by perception system)
         self.visible_entities = []
@@ -54,12 +60,8 @@ class Tank(Entity):
         self.fog_memory = None
 
         # Radar sweep and blips
-        self.radar_sweep_angle = (
-            0.0  # Current angle of radar sweep (clockwise in screen coords)
-        )
-        self.prev_radar_sweep_angle = (
-            0.0  # Previous frame's sweep angle for crossing detection
-        )
+        self.radar_sweep_angle = 0.0  # Current angle of radar sweep (clockwise in screen coords)
+        self.prev_radar_sweep_angle = 0.0  # Previous frame's sweep angle for crossing detection
         # Radar blips store: entity reference, timestamp, angle, snapshot x/y, entity type
         self.radar_blips = []
 
@@ -84,9 +86,7 @@ class Tank(Entity):
             self.mine_cooldown -= dt
 
         # Update radar sweep (clockwise in screen coordinates)
-        self.prev_radar_sweep_angle = (
-            self.radar_sweep_angle
-        )  # Store previous for crossing detection
+        self.prev_radar_sweep_angle = self.radar_sweep_angle  # Store previous for crossing detection
         self.radar_sweep_angle += RADAR_SWEEP_SPEED * dt
         full_circle = 360
         if self.radar_sweep_angle >= full_circle:

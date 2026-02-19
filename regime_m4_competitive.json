@@ -2,6 +2,7 @@
     "phase_a_enabled": true,
     "phase_b_enabled": true,
     "phase_c_enabled": true,
+    "max_steps_per_episode": 1800,
     "phase_a_episodes_per_stage": 100,
     "phase_b_episodes": 1200,
     "phase_c_episodes_per_stage": 300,
