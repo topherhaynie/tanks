@@ -3,4 +3,6 @@
 This module contains DQN, PPO trainers, self-play, and co-evolution logic.
 """
 
-__all__ = []
+from tanks.rl.trainers.dqn_trainer import DQNTrainer
+
+__all__ = ["DQNTrainer"]
