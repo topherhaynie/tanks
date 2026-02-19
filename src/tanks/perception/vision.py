@@ -3,7 +3,14 @@
 import math
 from typing import TYPE_CHECKING, Any
 
-from tanks.config.constants import FOG_TILE_SIZE, RADAR_RADIUS, TILE_SIZE, VISION_RADIUS
+from tanks.config.constants import (
+    ENTITY_VISION_RADIUS,
+    FOG_TILE_SIZE,
+    RADAR_JAMMING_RADIUS,
+    RADAR_RADIUS,
+    TILE_SIZE,
+    VISION_RADIUS,
+)
 
 if TYPE_CHECKING:
     from tanks.entities.entity import Entity
@@ -24,11 +31,14 @@ class VisionSystem:
         self.game_map = game_map
 
     def update_vision(self, tank: "Tank", all_entities: list["Entity"]) -> list["Entity"]:
-        """Update tank's visible entities based on line of sight and fog memory.
+        """Update tank's visible entities based on line of sight and fog state.
 
         Entities are visible if:
-        - Within VISION_RADIUS and line of sight is clear, OR
-        - In revealed terrain (from fog memory) and line of sight is clear
+        - Within VISION_RADIUS (150px) - active fog revelation range, OR
+        - Within ENTITY_VISION_RADIUS (600px) AND path is clear of fog (all fog tiles revealed)
+        - AND line of sight is clear (no walls)
+
+        Fog acts as a vision blocker for extended range. Entities can hide in/behind fog.
 
         Args:
             tank: The tank doing the looking.
@@ -54,19 +64,28 @@ class VisionSystem:
             dy = entity.y - tank.y
             distance = math.sqrt(dx * dx + dy * dy)
 
-            # Check if entity is within immediate vision radius
-            within_vision = distance <= VISION_RADIUS
+            # Check if entity is within either vision radius
+            within_active_vision = distance <= VISION_RADIUS
+            within_extended_vision = distance <= ENTITY_VISION_RADIUS
 
-            # Check if entity is in revealed terrain (fog memory)
-            in_revealed_terrain = False
-            if tank.fog_memory:
-                entity_ftx = int(entity.x / FOG_TILE_SIZE)
-                entity_fty = int(entity.y / FOG_TILE_SIZE)
-                in_revealed_terrain = tank.fog_memory.is_revealed(entity_ftx, entity_fty)
+            if not within_extended_vision:
+                continue
 
-            # Entity is visible if in vision range OR in revealed terrain, AND has line of sight
-            if (within_vision or in_revealed_terrain) and self.has_line_of_sight(tank.x, tank.y, entity.x, entity.y):
+            # Check line of sight (walls)
+            if not self.has_line_of_sight(tank.x, tank.y, entity.x, entity.y):
+                continue
+
+            # Within active vision radius - always visible if line of sight is clear
+            if within_active_vision:
                 visible.append(entity)
+                continue
+
+            # Extended vision - check if fog is blocking
+            if tank.fog_memory and self._has_fog_blocking(tank.x, tank.y, entity.x, entity.y, tank.fog_memory):
+                continue
+
+            # Extended vision with clear path - visible
+            visible.append(entity)
 
         return visible
 
@@ -115,6 +134,54 @@ class VisionSystem:
                 return False
 
         return True
+
+    def _has_fog_blocking(self, x1: float, y1: float, x2: float, y2: float, fog_memory: Any) -> bool:
+        """Check if unrevealed fog blocks the path between two points.
+
+        Args:
+            x1: Starting X position.
+            y1: Starting Y position.
+            x2: Target X position.
+            y2: Target Y position.
+            fog_memory: Fog memory to check tile states.
+
+        Returns:
+            True if fog is blocking, False if path is clear of fog.
+
+        """
+        dx = x2 - x1
+        dy = y2 - y1
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance == 0:
+            return False
+
+        # Normalize direction
+        dx /= distance
+        dy /= distance
+
+        # Step size (check every fog tile)
+        step_size = FOG_TILE_SIZE
+        steps = int(distance / step_size)
+
+        # Ray march from start to end, checking fog tiles
+        for i in range(steps + 1):
+            check_x = x1 + dx * i * step_size
+            check_y = y1 + dy * i * step_size
+
+            # Convert to fog tile coordinates
+            ftx = int(check_x / FOG_TILE_SIZE)
+            fty = int(check_y / FOG_TILE_SIZE)
+
+            # Check if this fog tile is within bounds and unrevealed
+            if (
+                0 <= ftx < fog_memory.fog_width
+                and 0 <= fty < fog_memory.fog_height
+                and not fog_memory.is_revealed(ftx, fty)
+            ):
+                return True  # Fog is blocking
+
+        return False  # No fog blocking
 
     def reveal_visible_terrain(self, tank: "Tank") -> None:
         """Reveal fog tiles visible from tank's position.
@@ -178,7 +245,7 @@ class VisionSystem:
         target_fty: int,
         fog_memory: Any,
     ) -> bool:
-        """Check line of sight and reveal wall tiles along the path.
+        """Check line of sight and reveal fog tiles along clear path only.
 
         Args:
             x1: Starting X position.
@@ -190,7 +257,7 @@ class VisionSystem:
             fog_memory: Fog memory to update.
 
         Returns:
-            True if target has line of sight or is the blocking wall.
+            True if target has line of sight or is a visible wall tile.
 
         """
         dx = x2 - x1
@@ -208,24 +275,13 @@ class VisionSystem:
         step_size = TILE_SIZE / 4
         steps = int(distance / step_size)
 
-        # Track fog tiles we've revealed along the path
-        revealed_fog_tiles = set()
+        # Track which fog tiles we've already revealed to avoid duplicates
+        revealed_tiles = set()
 
         # Ray march from start to end
         for i in range(steps + 1):
             check_x = x1 + dx * i * step_size
             check_y = y1 + dy * i * step_size
-
-            # Reveal fog tile at current position along ray
-            ftx = int(check_x / FOG_TILE_SIZE)
-            fty = int(check_y / FOG_TILE_SIZE)
-            if (
-                0 <= ftx < fog_memory.fog_width
-                and 0 <= fty < fog_memory.fog_height
-                and (ftx, fty) not in revealed_fog_tiles
-            ):
-                fog_memory.reveal_tile(ftx, fty)
-                revealed_fog_tiles.add((ftx, fty))
 
             # Convert to game tile coordinates for wall check
             tx = int(check_x / TILE_SIZE)
@@ -233,41 +289,43 @@ class VisionSystem:
 
             # Check if this game tile blocks vision
             if self.game_map.is_solid(tx, ty):
-                # Reveal all fog tiles that overlap with this wall tile
-                # (a 64px wall tile contains 2x2 fog tiles of 32px each)
-                self._reveal_wall_fog_tiles(tx, ty, fog_memory)
-
-                # If the target fog tile overlaps with this wall, consider it visible
+                # Reveal fog tiles that are part of this wall tile and within vision radius
+                # A 64px wall tile contains 2x2 fog tiles of 32px each
                 wall_ftx_min = (tx * TILE_SIZE) // FOG_TILE_SIZE
                 wall_ftx_max = ((tx + 1) * TILE_SIZE - 1) // FOG_TILE_SIZE
                 wall_fty_min = (ty * TILE_SIZE) // FOG_TILE_SIZE
                 wall_fty_max = ((ty + 1) * TILE_SIZE - 1) // FOG_TILE_SIZE
 
+                # Reveal fog tiles that overlap with this wall, but only if within vision radius
+                for wall_fty in range(wall_fty_min, wall_fty_max + 1):
+                    for wall_ftx in range(wall_ftx_min, wall_ftx_max + 1):
+                        if 0 <= wall_ftx < fog_memory.fog_width and 0 <= wall_fty < fog_memory.fog_height:
+                            # Check if this fog tile's center is within vision radius
+                            fog_center_x = (wall_ftx + 0.5) * FOG_TILE_SIZE
+                            fog_center_y = (wall_fty + 0.5) * FOG_TILE_SIZE
+                            dist_x = fog_center_x - x1
+                            dist_y = fog_center_y - y1
+                            dist = math.sqrt(dist_x * dist_x + dist_y * dist_y)
+
+                            if dist <= VISION_RADIUS:
+                                fog_memory.reveal_tile(wall_ftx, wall_fty)
+
+                # Vision is blocked - check if target is part of this wall
                 return wall_ftx_min <= target_ftx <= wall_ftx_max and wall_fty_min <= target_fty <= wall_fty_max
 
-        return True  # Clear line of sight
+            # No wall at this position - reveal the fog tile here
+            ftx = int(check_x / FOG_TILE_SIZE)
+            fty = int(check_y / FOG_TILE_SIZE)
+            if (
+                0 <= ftx < fog_memory.fog_width
+                and 0 <= fty < fog_memory.fog_height
+                and (ftx, fty) not in revealed_tiles
+            ):
+                fog_memory.reveal_tile(ftx, fty)
+                revealed_tiles.add((ftx, fty))
 
-    def _reveal_wall_fog_tiles(self, tx: int, ty: int, fog_memory: Any) -> None:
-        """Reveal all fog tiles that overlap with a wall tile.
-
-        Args:
-            tx: Wall tile X coordinate.
-            ty: Wall tile Y coordinate.
-            fog_memory: Fog memory to update.
-
-        """
-        # Calculate fog tile range that overlaps with this wall tile
-        # A 64px wall tile contains 2x2 fog tiles of 32px each
-        ftx_min = (tx * TILE_SIZE) // FOG_TILE_SIZE
-        ftx_max = ((tx + 1) * TILE_SIZE - 1) // FOG_TILE_SIZE
-        fty_min = (ty * TILE_SIZE) // FOG_TILE_SIZE
-        fty_max = ((ty + 1) * TILE_SIZE - 1) // FOG_TILE_SIZE
-
-        # Reveal all fog tiles that overlap with this wall
-        for fty in range(fty_min, fty_max + 1):
-            for ftx in range(ftx_min, ftx_max + 1):
-                if 0 <= ftx < fog_memory.fog_width and 0 <= fty < fog_memory.fog_height:
-                    fog_memory.reveal_tile(ftx, fty)
+        # Clear line of sight to target
+        return True
 
 
 class RadarSystem:
@@ -277,6 +335,7 @@ class RadarSystem:
         """Detect entities within radar range.
 
         Radar is not blocked by walls and only detects tanks and mines.
+        Radar can be jammed by enemy tanks with active jamming.
 
         Args:
             tank: The tank using radar.
@@ -286,6 +345,31 @@ class RadarSystem:
             List of tuples (entity, distance, angle_degrees) for detected entities.
 
         """
+        # Check if tank's radar is being jammed
+        is_jammed = False
+        for entity in all_entities:
+            entity_type = type(entity).__name__
+            if (
+                entity_type == "Tank"
+                and entity != tank
+                and entity.active
+                and hasattr(entity, "team")
+                and entity.team != tank.team
+                and hasattr(entity, "jamming_active")
+                and entity.jamming_active
+            ):
+                # Check if jammer is within jamming range
+                dx = entity.x - tank.x
+                dy = entity.y - tank.y
+                distance = math.sqrt(dx * dx + dy * dy)
+                if distance <= RADAR_JAMMING_RADIUS:
+                    is_jammed = True
+                    break
+
+        # If jammed, return empty detections
+        if is_jammed:
+            return []
+
         detected = []
 
         for entity in all_entities:

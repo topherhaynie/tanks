@@ -10,6 +10,7 @@ from tanks.config.constants import (
     FPS,
     INPUT_RATE,
     PHYSICS_RATE,
+    RADAR_SWEEP_SPEED,
     WINDOW_HEIGHT,
     WINDOW_TITLE,
     WINDOW_WIDTH,
@@ -253,6 +254,74 @@ class Game:
             # Update radar (not blocked by walls)
             tank.radar_detections = self.radar_system.detect_entities(tank, all_entities)
 
+            # Check for new radar detections (trigger sound)
+            current_radar_entities = {entity for entity, _, _ in tank.radar_detections}
+            new_detections = current_radar_entities - tank.previous_radar_entities
+
+            # Play radar ping for new detections (only if not visible)
+            if new_detections:
+                for entity in new_detections:
+                    if entity not in tank.visible_entities:
+                        self.sound_manager.play_radar_ping()
+                        break  # Only play sound once even if multiple new entities
+
+            tank.previous_radar_entities = current_radar_entities
+
+            # Update radar sweep blips (detect when sweep crosses targets)
+            self._update_radar_sweep_blips(tank)
+
+    def _update_radar_sweep_blips(self, tank: Tank) -> None:
+        """Update radar blips when sweep crosses detected entities.
+
+        Args:
+            tank: Tank whose radar sweep to update.
+
+        """
+        import time
+
+        current_time = time.time()
+
+        # Check if sweep crosses any radar-detected entities
+        for entity, _distance, angle_deg in tank.radar_detections:
+            # Skip if entity is visible (no need for radar blip)
+            if entity in tank.visible_entities:
+                continue
+
+            # Normalize angles to 0-360
+            entity_angle = angle_deg % 360
+            current_sweep = tank.radar_sweep_angle % 360
+            prev_sweep = tank.prev_radar_sweep_angle % 360
+            
+            # Check if sweep JUST CROSSED the entity angle (from prev to current)
+            # Handle wraparound at 0/360 degrees
+            crossed = False
+            if prev_sweep < current_sweep:
+                # Normal case: no wraparound
+                crossed = prev_sweep <= entity_angle <= current_sweep
+            else:
+                # Wraparound case: sweep crosses 0
+                crossed = entity_angle >= prev_sweep or entity_angle <= current_sweep
+
+            # Add blip if sweep crossed the entity angle
+            if crossed:
+                # Check if entity already has a recent blip
+                has_recent_blip = any(
+                    blip_entity == entity and (current_time - blip_time) < 0.5
+                    for blip_entity, blip_time, *_ in tank.radar_blips
+                )
+
+                if not has_recent_blip:
+                    # Capture snapshot at time of detection
+                    entity_type = type(entity).__name__
+                    tank.radar_blips.append((entity, current_time, entity_angle, entity.x, entity.y, entity_type))
+
+        # Remove old blips (faded out)
+        tank.radar_blips = [
+            (entity, blip_time, angle, snap_x, snap_y, entity_type)
+            for entity, blip_time, angle, snap_x, snap_y, entity_type in tank.radar_blips
+            if (current_time - blip_time) < 2.0 and entity.active  # Keep for 2 seconds
+        ]
+
     def update(self, dt: float) -> None:
         """Legacy update method for backward compatibility.
 
@@ -311,5 +380,7 @@ class Game:
             self.settings.show_vision = not self.settings.show_vision
         elif key == pygame.K_F4:
             self.settings.show_radar_blips = not self.settings.show_radar_blips
+        elif key == pygame.K_F5:
+            self.settings.show_minimap = not self.settings.show_minimap
         elif key == pygame.K_p:
             self.settings.paused = not self.settings.paused

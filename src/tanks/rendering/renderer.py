@@ -1,6 +1,7 @@
 """Main renderer coordinating all drawing."""
 
 import math
+import time
 from typing import TYPE_CHECKING, Any
 
 import pygame
@@ -16,15 +17,32 @@ from tanks.config.constants import (
     COLOR_BULLET,
     COLOR_DEBUG_HITBOX,
     COLOR_FOG,
-    COLOR_RADAR_BLIP,
+    COLOR_MINIMAP_BACKGROUND,
+    COLOR_MINIMAP_BORDER,
+    COLOR_MINIMAP_RADAR_RANGE,
+    COLOR_MINIMAP_TANK_ENEMY,
+    COLOR_MINIMAP_TANK_FRIENDLY,
+    COLOR_MINIMAP_VISION_RANGE,
+    COLOR_MINIMAP_WALL,
+    COLOR_RADAR_BLIP_MINE,
+    COLOR_RADAR_BLIP_TANK,
+    COLOR_RADAR_JAMMING,
     COLOR_RADAR_OVERLAY,
     COLOR_RADAR_SWEEP,
+    COLOR_RADAR_SWEEP_BAR,
     COLOR_TANK_ENEMY,
     COLOR_TANK_FRIENDLY,
     COLOR_VISION_OVERLAY,
     COLOR_WALL,
+    FOG_GRADIENT_SCALE,
     FOG_TILE_SIZE,
+    MINIMAP_MIN_REVEALED_FOG_TILES,
+    MINIMAP_PADDING,
+    MINIMAP_SIZE,
+    RADAR_BLIP_FADE_TIME,
+    RADAR_JAMMING_RADIUS,
     RADAR_RADIUS,
+    RADAR_VISUAL_RADIUS,
     TILE_SIZE,
     TILE_WALL_DIAGONAL_NE,
     TILE_WALL_DIAGONAL_NW,
@@ -50,7 +68,6 @@ class Renderer:
         self.settings = settings
         self.font = None
         self.perspective_tank = None  # Tank from whose perspective to render fog
-        self.radar_sweep_angle = 0.0  # Current angle of radar sweep animation
         self.fog_gradient_stamp = None  # Pre-rendered fog gradient for performance
 
         # Initialize font for debug text
@@ -89,16 +106,19 @@ class Renderer:
         if self.perspective_tank and self.perspective_tank.fog_memory:
             self.render_fog_of_war(game_state.game_map, self.perspective_tank)
 
+        current_time = time.time()
+
         # Layer 2.8: Radar blips (on top of fog since radar sees through walls)
         if self.perspective_tank and self.settings.show_radar_blips:
-            self.render_radar_blips(self.perspective_tank)
+            self.render_radar_blips(self.perspective_tank, current_time)
 
-        # Update radar sweep animation
-        radar_sweep_degrees_per_second = 180
-        self.radar_sweep_angle += radar_sweep_degrees_per_second * (1.0 / 60.0)  # At 60fps
-        full_circle_degrees = 360
-        if self.radar_sweep_angle >= full_circle_degrees:
-            self.radar_sweep_angle -= full_circle_degrees
+        # Layer 2.85: Radar jamming effects
+        if self.settings.show_radar_blips:
+            self.render_jamming_effects(game_state.tanks)
+
+        # Layer 2.9: Minimap with radar overlay
+        if self.perspective_tank and self.settings.show_minimap:
+            self.render_minimap(game_state, self.perspective_tank, current_time)
 
         # Layer 3: Debug overlays
         if self.settings.show_hitboxes:
@@ -109,6 +129,10 @@ class Renderer:
 
         if self.settings.show_fps:
             self.render_fps(game_state.fps)
+
+        # Render jamming status for perspective tank
+        if self.perspective_tank:
+            self.render_jamming_status(self.perspective_tank)
 
         # Update display
         pygame.display.flip()
@@ -333,22 +357,50 @@ class Renderer:
         fps_text = self.small_font.render(f"FPS: {int(fps)}", True, (255, 255, 255))
         self.screen.blit(fps_text, (10, 10))
 
+    def render_jamming_status(self, tank: "Tank") -> None:
+        """Render jamming cooldown status for perspective tank.
+
+        Args:
+            tank: Tank to show jamming status for.
+
+        """
+        if not tank.active or not hasattr(tank, "jamming_cooldown"):
+            return
+
+        y_offset = 30  # Below FPS counter
+
+        if tank.jamming_active:
+            # Show active jamming timer
+            status_text = f"JAMMING: {tank.jamming_timer:.1f}s"
+            color = (255, 100, 100)  # Red when active
+        elif tank.jamming_cooldown > 0:
+            # Show cooldown
+            status_text = f"Jam Cooldown: {tank.jamming_cooldown:.1f}s"
+            color = (150, 150, 150)  # Gray during cooldown
+        else:
+            # Show ready status
+            status_text = "Jam Ready (J)"
+            color = (100, 255, 100)  # Green when ready
+
+        text_surface = self.small_font.render(status_text, True, color)
+        self.screen.blit(text_surface, (10, y_offset))
+
     def _create_fog_gradient_stamp(self) -> None:
         """Pre-render a fog gradient stamp for performance."""
-        # Create a larger circular gradient stamp for smoother blending
-        stamp_radius = int(FOG_TILE_SIZE * 2.0)  # Increased from 1.5x to 2.0x
+        # Create a gradient stamp for smoother fog edges
+        stamp_radius = int(FOG_TILE_SIZE * FOG_GRADIENT_SCALE)  # Configurable gradient bleed
         stamp_size = stamp_radius * 2
         self.fog_gradient_stamp = pygame.Surface((stamp_size, stamp_size), pygame.SRCALPHA)
 
-        # Draw concentric circles with smoother decreasing alpha
-        gradient_steps = 20  # Increased from 16 for smoother gradient
+        # Draw concentric circles with decreasing alpha
+        gradient_steps = 16
         for i in range(gradient_steps):
             progress = i / gradient_steps
-            # Adjusted falloff curve for smoother blending
-            radius = int(stamp_radius * (1.0 - progress * 0.5))  # Less aggressive falloff
+            # Gradient extends from center to edge
+            radius = int(stamp_radius * (1.0 - progress * 0.6))
 
-            # Smooth alpha curve with exponential falloff
-            alpha = int(COLOR_FOG[3] * (progress**1.5))  # Exponential makes it smoother
+            # Smooth alpha curve
+            alpha = int(COLOR_FOG[3] * (progress**2))  # Quadratic for tighter falloff
             color = (COLOR_FOG[0], COLOR_FOG[1], COLOR_FOG[2], alpha)
 
             pygame.draw.circle(self.fog_gradient_stamp, color, (stamp_radius, stamp_radius), radius)
@@ -447,80 +499,430 @@ class Renderer:
             overlay,
             COLOR_RADAR_OVERLAY,
             (int(tank.x), int(tank.y)),
-            int(RADAR_RADIUS),
+            int(RADAR_VISUAL_RADIUS),
             2,  # Width for outline
         )
 
         # Draw radar sweep line
-        sweep_rad = math.radians(self.radar_sweep_angle)
-        sweep_end_x = tank.x + math.cos(sweep_rad) * RADAR_RADIUS
-        sweep_end_y = tank.y + math.sin(sweep_rad) * RADAR_RADIUS
+        sweep_rad = math.radians(tank.radar_sweep_angle)
+        sweep_end_x = tank.x + math.cos(sweep_rad) * RADAR_VISUAL_RADIUS
+        sweep_end_y = tank.y + math.sin(sweep_rad) * RADAR_VISUAL_RADIUS
         pygame.draw.line(overlay, COLOR_RADAR_SWEEP, (tank.x, tank.y), (sweep_end_x, sweep_end_y), 2)
 
         # Blit overlay to screen
         self.screen.blit(overlay, (0, 0))
 
-    def render_radar_blips(self, tank: "Tank") -> None:
-        """Render radar detection blips for entities detected by radar.
+    def render_radar_blips(self, tank: "Tank", current_time: float) -> None:
+        """Render radar sweep bar and fading blips for detected entities.
 
         Args:
-            tank: Tank whose radar detections to render.
+            tank: Tank whose radar to render.
+            current_time: Timestamp for consistent radar timing this frame.
 
         """
-        if not tank.active or not hasattr(tank, "radar_detections"):
+        if not tank.active or not hasattr(tank, "radar_sweep_angle"):
             return
 
         # Create overlay surface
         overlay = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
 
-        # Render each radar detection
-        for entity, distance, _angle_deg in tank.radar_detections:
-            # Skip if entity is already visible (don't need radar blip)
-            if entity in tank.visible_entities:
-                continue
+        # Draw rotating green sweep line (counter-clockwise)
+        sweep_angle_rad = math.radians(tank.radar_sweep_angle)
+        sweep_end_x = tank.x + math.cos(sweep_angle_rad) * RADAR_VISUAL_RADIUS
+        sweep_end_y = tank.y + math.sin(sweep_angle_rad) * RADAR_VISUAL_RADIUS
+        pygame.draw.line(overlay, COLOR_RADAR_SWEEP_BAR, (tank.x, tank.y), (sweep_end_x, sweep_end_y), 2)
 
-            # Calculate blip size based on distance (closer = larger)
-            max_blip_size = 12
-            min_blip_size = 4
-            distance_ratio = min(distance / RADAR_RADIUS, 1.0)
-            blip_size = int(max_blip_size - (max_blip_size - min_blip_size) * distance_ratio)
+        # Draw fading blips for detected entities
+        if hasattr(tank, "radar_blips"):
+            for entity, blip_time, _angle, snap_x, snap_y, entity_type in tank.radar_blips:
+                if not entity.active:
+                    continue
 
-            # Draw pulsing radar blip
-            pulse_scale = 1.0 + 0.3 * math.sin(self.radar_sweep_angle * math.pi / 180 * 4)
-            current_blip_size = int(blip_size * pulse_scale)
+                # Calculate fade based on time
+                age = current_time - blip_time
+                if age >= RADAR_BLIP_FADE_TIME:
+                    continue
 
-            # Draw outer ring (pulse effect)
-            pygame.draw.circle(
-                overlay,
-                COLOR_RADAR_BLIP,
-                (int(entity.x), int(entity.y)),
-                current_blip_size + 3,
-                2,
-            )
+                fade_ratio = 1.0 - (age / RADAR_BLIP_FADE_TIME)
 
-            # Draw inner filled circle with varying alpha
-            inner_alpha = max(0, min(255, int(200 * (2.0 - pulse_scale))))
-            inner_color = (COLOR_RADAR_BLIP[0], COLOR_RADAR_BLIP[1], COLOR_RADAR_BLIP[2], inner_alpha)
-            pygame.draw.circle(
-                overlay,
-                inner_color,
-                (int(entity.x), int(entity.y)),
-                current_blip_size,
-            )
+                # Determine color based on entity type (from snapshot)
+                base_color = COLOR_RADAR_BLIP_MINE if entity_type == "Mine" else COLOR_RADAR_BLIP_TANK
 
-            # Draw directional line from perspective tank to blip
-            line_alpha = 80
-            line_color = (COLOR_RADAR_BLIP[0], COLOR_RADAR_BLIP[1], COLOR_RADAR_BLIP[2], line_alpha)
-            pygame.draw.line(
-                overlay,
-                line_color,
-                (int(tank.x), int(tank.y)),
-                (int(entity.x), int(entity.y)),
-                1,
-            )
+                # Apply fade to alpha
+                blip_alpha = int(base_color[3] * fade_ratio)
+                blip_color = (base_color[0], base_color[1], base_color[2], blip_alpha)
+
+                # Draw pulsing blip
+                pulse = 1.0 + 0.2 * math.sin(current_time * 10)  # Fast pulse
+                blip_size = int(10 * fade_ratio * pulse)
+
+                # Draw outer ring at snapshot position
+                pygame.draw.circle(
+                    overlay,
+                    blip_color,
+                    (int(snap_x), int(snap_y)),
+                    blip_size + 3,
+                    2,
+                )
+
+                # Draw inner filled circle
+                inner_alpha = int(blip_alpha * 0.6)
+                inner_color = (base_color[0], base_color[1], base_color[2], inner_alpha)
+                pygame.draw.circle(
+                    overlay,
+                    inner_color,
+                    (int(snap_x), int(snap_y)),
+                    blip_size,
+                )
 
         # Blit overlay to screen
         self.screen.blit(overlay, (0, 0))
+
+    def render_jamming_effects(self, tanks: list["Tank"]) -> None:
+        """Render radar jamming visual effects.
+
+        Args:
+            tanks: List of all tanks to check for active jamming.
+
+        """
+        overlay = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
+
+        for tank in tanks:
+            if not tank.active:
+                continue
+
+            # Check if tank has jamming active
+            if hasattr(tank, "jamming_active") and tank.jamming_active:
+                # Draw pulsing jamming effect circle
+                pulse_scale = 1.0 + 0.2 * math.sin(tank.radar_sweep_angle * math.pi / 180 * 6)
+                jamming_radius = int(RADAR_JAMMING_RADIUS * pulse_scale)
+
+                # Draw multiple concentric circles for wave effect
+                for i in range(3):
+                    radius_offset = i * 30
+                    alpha = max(0, int(COLOR_RADAR_JAMMING[3] * (1.0 - i * 0.3)))
+                    color = (COLOR_RADAR_JAMMING[0], COLOR_RADAR_JAMMING[1], COLOR_RADAR_JAMMING[2], alpha)
+                    pygame.draw.circle(
+                        overlay,
+                        color,
+                        (int(tank.x), int(tank.y)),
+                        jamming_radius - radius_offset,
+                        2,
+                    )
+
+                # Draw "JAMMING" text above tank
+                jam_text = "JAMMING"
+                text_surface = self.small_font.render(jam_text, True, (255, 100, 100))
+                text_bg = pygame.Surface((text_surface.get_width() + 4, text_surface.get_height() + 2), pygame.SRCALPHA)
+                text_bg.fill((0, 0, 0, 180))
+
+                text_x = int(tank.x) - text_surface.get_width() // 2
+                text_y = int(tank.y) - tank.radius - 30
+
+                overlay.blit(text_bg, (text_x - 2, text_y - 1))
+                overlay.blit(text_surface, (text_x, text_y))
+
+        self.screen.blit(overlay, (0, 0))
+
+    def render_minimap(self, game_state: Any, tank: "Tank", current_time: float) -> None:
+        """Render minimap with radar overlay.
+
+        Args:
+            game_state: Current game state.
+            tank: Tank from whose perspective to render.
+            current_time: Timestamp for consistent radar timing this frame.
+
+        """
+        if not tank.active:
+            return
+
+        # Calculate minimap position and scale
+        minimap_x = self.screen.get_width() - MINIMAP_SIZE - MINIMAP_PADDING
+        minimap_y = self.screen.get_height() - MINIMAP_SIZE - MINIMAP_PADDING
+        map_width_px = game_state.game_map.width * TILE_SIZE
+        map_height_px = game_state.game_map.height * TILE_SIZE
+        scale = MINIMAP_SIZE / max(map_width_px, map_height_px)
+
+        # Calculate offsets to center the map on the minimap
+        scaled_map_width = map_width_px * scale
+        scaled_map_height = map_height_px * scale
+        offset_x = (MINIMAP_SIZE - scaled_map_width) / 2
+        offset_y = (MINIMAP_SIZE - scaled_map_height) / 2
+
+        # Create minimap surface
+        minimap = pygame.Surface((MINIMAP_SIZE, MINIMAP_SIZE), pygame.SRCALPHA)
+        minimap.fill(COLOR_MINIMAP_BACKGROUND)
+
+        # Draw map elements (pass offsets to center content)
+        self._draw_minimap_revealed_areas(minimap, tank, game_state.game_map, scale, offset_x, offset_y)
+        self._draw_minimap_ranges(minimap, tank, scale, offset_x, offset_y)
+        self._draw_minimap_tanks(minimap, game_state.tanks, tank, scale, offset_x, offset_y, current_time)
+        self._draw_minimap_radar_blips(minimap, tank, scale, offset_x, offset_y, current_time)
+
+        # Draw border and blit to screen
+        pygame.draw.rect(minimap, COLOR_MINIMAP_BORDER, (0, 0, MINIMAP_SIZE, MINIMAP_SIZE), 2)
+        self.screen.blit(minimap, (minimap_x, minimap_y))
+
+    def _draw_minimap_revealed_areas(
+        self,
+        minimap: pygame.Surface,
+        tank: "Tank",
+        game_map: "Map",
+        scale: float,
+        offset_x: float,
+        offset_y: float,
+    ) -> None:
+        """Draw revealed fog areas and walls on minimap.
+
+        Args:
+            minimap: Minimap surface to draw on.
+            tank: Perspective tank with fog memory.
+            game_map: Game map with wall tiles.
+            scale: Scale factor for minimap.
+            offset_x: X offset to center map on minimap.
+            offset_y: Y offset to center map on minimap.
+
+        """
+        if not tank.fog_memory:
+            return
+
+        # Draw each revealed fog tile
+        for fty in range(tank.fog_memory.fog_height):
+            for ftx in range(tank.fog_memory.fog_width):
+                if tank.fog_memory.is_revealed(ftx, fty):
+                    # Convert fog tile to minimap coordinates
+                    fog_x = ftx * FOG_TILE_SIZE
+                    fog_y = fty * FOG_TILE_SIZE
+                    mini_x = int(fog_x * scale + offset_x)
+                    mini_y = int(fog_y * scale + offset_y)
+                    mini_size = max(1, int(FOG_TILE_SIZE * scale))
+
+                    # Draw revealed area as lighter background
+                    revealed_color = (40, 40, 60, 100)  # Slightly lighter than background
+                    pygame.draw.rect(minimap, revealed_color, (mini_x, mini_y, mini_size, mini_size))
+
+        # Draw walls in revealed areas
+        for y in range(game_map.height):
+            for x in range(game_map.width):
+                tile_type = game_map.get_tile(x, y)
+                if tile_type > 0:  # Wall tile
+                    # Check if this wall tile is in a revealed area
+                    # A 64px wall tile overlaps with 2x2 fog tiles of 32px each
+                    # Check all 4 fog tiles under this wall and require at least 3 to be revealed
+                    wall_left = x * TILE_SIZE
+                    wall_top = y * TILE_SIZE
+
+                    # Get the 4 fog tile coordinates
+                    fog_tiles = [
+                        (int(wall_left / FOG_TILE_SIZE), int(wall_top / FOG_TILE_SIZE)),
+                        (
+                            int((wall_left + TILE_SIZE - 1) / FOG_TILE_SIZE),
+                            int(wall_top / FOG_TILE_SIZE),
+                        ),
+                        (
+                            int(wall_left / FOG_TILE_SIZE),
+                            int((wall_top + TILE_SIZE - 1) / FOG_TILE_SIZE),
+                        ),
+                        (
+                            int((wall_left + TILE_SIZE - 1) / FOG_TILE_SIZE),
+                            int((wall_top + TILE_SIZE - 1) / FOG_TILE_SIZE),
+                        ),
+                    ]
+
+                    # Count how many fog tiles are revealed
+                    revealed_count = sum(
+                        1
+                        for ftx, fty in fog_tiles
+                        if 0 <= ftx < tank.fog_memory.fog_width
+                        and 0 <= fty < tank.fog_memory.fog_height
+                        and tank.fog_memory.is_revealed(ftx, fty)
+                    )
+
+                    # Only show wall if at least MIN_REVEALED_FOG_TILES of 4 fog tiles are revealed
+                    if revealed_count >= MINIMAP_MIN_REVEALED_FOG_TILES:
+                        # Draw wall on minimap
+                        mini_x = int(x * TILE_SIZE * scale + offset_x)
+                        mini_y = int(y * TILE_SIZE * scale + offset_y)
+                        mini_size = max(1, int(TILE_SIZE * scale))
+                        pygame.draw.rect(minimap, COLOR_MINIMAP_WALL, (mini_x, mini_y, mini_size, mini_size))
+
+    def _draw_minimap_ranges(
+        self,
+        minimap: pygame.Surface,
+        tank: "Tank",
+        scale: float,
+        offset_x: float,
+        offset_y: float,
+    ) -> None:
+        """Draw radar and vision range circles on minimap.
+
+        Args:
+            minimap: Minimap surface to draw on.
+            tank: Perspective tank.
+            scale: Scale factor for minimap.
+            offset_x: X offset to center map on minimap.
+            offset_y: Y offset to center map on minimap.
+
+        """
+        tank_mini_x = int(tank.x * scale + offset_x)
+        tank_mini_y = int(tank.y * scale + offset_y)
+
+        # Draw radar range circle (actual detection radius for tactical accuracy)
+        radar_mini_radius = int(RADAR_RADIUS * scale)
+        pygame.draw.circle(minimap, COLOR_MINIMAP_RADAR_RANGE, (tank_mini_x, tank_mini_y), radar_mini_radius, 1)
+
+        # Draw vision range circle
+        vision_mini_radius = int(VISION_RADIUS * scale)
+        pygame.draw.circle(minimap, COLOR_MINIMAP_VISION_RANGE, (tank_mini_x, tank_mini_y), vision_mini_radius, 1)
+
+    def _draw_minimap_tanks(
+        self,
+        minimap: pygame.Surface,
+        tanks: list["Tank"],
+        perspective_tank: "Tank",
+        scale: float,
+        offset_x: float,
+        offset_y: float,
+        current_time: float,
+    ) -> None:
+        """Draw tanks on minimap.
+
+        Args:
+            minimap: Minimap surface to draw on.
+            tanks: List of all tanks.
+            perspective_tank: Tank from whose perspective to render.
+            scale: Scale factor for minimap.
+            offset_x: X offset to center map on minimap.
+            offset_y: Y offset to center map on minimap.
+            current_time: Timestamp for consistent radar timing this frame.
+
+        """
+        for other_tank in tanks:
+            if not other_tank.active:
+                continue
+
+            other_mini_x = int(other_tank.x * scale + offset_x)
+            other_mini_y = int(other_tank.y * scale + offset_y)
+
+            if other_tank == perspective_tank:
+                self._draw_perspective_tank_on_minimap(minimap, other_tank, other_mini_x, other_mini_y)
+            elif other_tank.team == perspective_tank.team:
+                pygame.draw.circle(minimap, COLOR_MINIMAP_TANK_FRIENDLY, (other_mini_x, other_mini_y), 3)
+            elif other_tank in perspective_tank.visible_entities:
+                # Fully visible - solid red square
+                square_size = 6
+                pygame.draw.rect(
+                    minimap,
+                    COLOR_MINIMAP_TANK_ENEMY,
+                    (other_mini_x - square_size // 2, other_mini_y - square_size // 2, square_size, square_size),
+                )
+            else:
+                # Check radar blips for this tank with fade
+                for entity, timestamp, _angle, snap_x, snap_y, _entity_type in perspective_tank.radar_blips:
+                    if entity == other_tank:
+                        # Calculate fade based on time since detection
+                        age = current_time - timestamp
+                        if age < RADAR_BLIP_FADE_TIME:
+                            # Fade from 255 to 0 over RADAR_BLIP_FADE_TIME seconds
+                            fade_progress = age / RADAR_BLIP_FADE_TIME
+                            alpha = int(255 * (1.0 - fade_progress))
+
+                            # Draw fading red square at snapshot position
+                            square_size = 6
+                            blip_mini_x = int(snap_x * scale + offset_x)
+                            blip_mini_y = int(snap_y * scale + offset_y)
+                            temp_surface = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
+                            faded_color = (*COLOR_MINIMAP_TANK_ENEMY[:3], alpha)
+                            pygame.draw.rect(
+                                temp_surface,
+                                faded_color,
+                                (0, 0, square_size, square_size),
+                            )
+                            minimap.blit(
+                                temp_surface,
+                                (blip_mini_x - square_size // 2, blip_mini_y - square_size // 2),
+                            )
+                        break
+
+    def _draw_perspective_tank_on_minimap(
+        self,
+        minimap: pygame.Surface,
+        tank: "Tank",
+        mini_x: int,
+        mini_y: int,
+    ) -> None:
+        """Draw the perspective tank with heading indicator on minimap.
+
+        Args:
+            minimap: Minimap surface to draw on.
+            tank: The perspective tank.
+            mini_x: Tank X position on minimap.
+            mini_y: Tank Y position on minimap.
+
+        """
+        tank_size = 5
+        pygame.draw.circle(minimap, COLOR_MINIMAP_TANK_FRIENDLY, (mini_x, mini_y), tank_size)
+
+        # Draw heading indicator
+        angle_rad = math.radians(tank.turret_angle)
+        end_x = int(mini_x + math.cos(angle_rad) * tank_size * 2)
+        end_y = int(mini_y + math.sin(angle_rad) * tank_size * 2)
+        pygame.draw.line(minimap, COLOR_MINIMAP_TANK_FRIENDLY, (mini_x, mini_y), (end_x, end_y), 2)
+
+    def _draw_minimap_radar_blips(
+        self,
+        minimap: pygame.Surface,
+        tank: "Tank",
+        scale: float,
+        offset_x: float,
+        offset_y: float,
+        current_time: float,
+    ) -> None:
+        """Draw radar-detected entities on minimap.
+
+        Args:
+            minimap: Minimap surface to draw on.
+            tank: Perspective tank.
+            scale: Scale factor for minimap.
+            offset_x: X offset to center map on minimap.
+            offset_y: Y offset to center map on minimap.
+            current_time: Timestamp for consistent radar timing this frame.
+
+        """
+        for entity, timestamp, _angle, snap_x, snap_y, entity_type in tank.radar_blips:
+            # Only show entities with active (non-expired) blips
+            age = current_time - timestamp
+            if age >= RADAR_BLIP_FADE_TIME:
+                continue
+
+            # Skip if entity is visible (already drawn elsewhere) or inactive
+            if entity in tank.visible_entities or not entity.active:
+                continue
+
+            # Skip tanks (they're drawn in _draw_minimap_tanks with fade)
+            if entity_type == "Tank":
+                continue
+
+            # Use snapshot position
+            entity_mini_x = int(snap_x * scale + offset_x)
+            entity_mini_y = int(snap_y * scale + offset_y)
+
+            # Determine color by entity type (from snapshot)
+            color = COLOR_RADAR_BLIP_MINE if entity_type == "Mine" else COLOR_RADAR_BLIP_TANK
+
+            # Calculate fade
+            fade_progress = age / RADAR_BLIP_FADE_TIME
+            alpha = int(255 * (1.0 - fade_progress))
+
+            # Draw fading dot
+            pulse_scale = 1.0 + 0.2 * math.sin(tank.radar_sweep_angle * math.pi / 180 * 4)
+            blip_size = int(2 * pulse_scale)
+
+            # Create temporary surface for alpha blending
+            temp_surface = pygame.Surface((blip_size * 2, blip_size * 2), pygame.SRCALPHA)
+            faded_color = (*color[:3], alpha)
+            pygame.draw.circle(temp_surface, faded_color, (blip_size, blip_size), blip_size)
+            minimap.blit(temp_surface, (entity_mini_x - blip_size, entity_mini_y - blip_size))
 
     def set_perspective_tank(self, tank: "Tank | None") -> None:
         """Set which tank's perspective to render fog from.

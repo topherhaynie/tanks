@@ -38,6 +38,7 @@ class SoundManager:
             "bounce": None,  # Bullet bouncing off wall
             "explosion": None,  # Tank destruction
             "engine": None,  # Tank movement (could be looping)
+            "radar_ping": None,  # Radar detection sound
         }
 
     def play(self, sound_name: str, volume: float = 1.0) -> None:
@@ -74,6 +75,10 @@ class SoundManager:
     def play_explosion(self) -> None:
         """Play the explosion sound effect."""
         self.play("explosion", volume=0.8)
+
+    def play_radar_ping(self) -> None:
+        """Play the radar ping sound effect."""
+        self.play("radar_ping", volume=0.3)
 
     def stop_all(self) -> None:
         """Stop all currently playing sounds."""

@@ -34,9 +34,11 @@ class KeyboardController(Controller):
                 "turn_left": pygame.K_a,
                 "turn_right": pygame.K_d,
                 "shoot": pygame.K_SPACE,
+                "jam": pygame.K_j,
             }
 
         self.key_bindings = key_bindings
+        self.jam_key_was_pressed = False  # Track jam key state for single activation
 
     def update(self, dt: float) -> None:
         """Update tank based on keyboard input.
@@ -74,6 +76,12 @@ class KeyboardController(Controller):
         if keys[self.key_bindings["shoot"]]:
             self.game.shoot_bullet(self.tank)
 
+        # Radar jamming (single activation on key press)
+        jam_key_pressed = keys[self.key_bindings["jam"]]
+        if jam_key_pressed and not self.jam_key_was_pressed and hasattr(self.tank, "activate_jamming"):
+            self.tank.activate_jamming()
+        self.jam_key_was_pressed = jam_key_pressed
+
 
 class KeyboardController2(Controller):
     """Second keyboard controller for player 2 (arrow keys + RCtrl)."""
@@ -94,9 +102,11 @@ class KeyboardController2(Controller):
             "turn_left": pygame.K_LEFT,
             "turn_right": pygame.K_RIGHT,
             "shoot": pygame.K_RCTRL,
+            "jam": pygame.K_RSHIFT,
         }
 
         self.aim_angle = 0
+        self.jam_key_was_pressed = False  # Track jam key state for single activation
 
     def update(self, dt: float) -> None:
         """Update tank based on keyboard input.
@@ -136,3 +146,9 @@ class KeyboardController2(Controller):
         # Shooting
         if keys[self.key_bindings["shoot"]]:
             self.game.shoot_bullet(self.tank)
+
+        # Radar jamming (single activation on key press)
+        jam_key_pressed = keys[self.key_bindings["jam"]]
+        if jam_key_pressed and not self.jam_key_was_pressed and hasattr(self.tank, "activate_jamming"):
+            self.tank.activate_jamming()
+        self.jam_key_was_pressed = jam_key_pressed

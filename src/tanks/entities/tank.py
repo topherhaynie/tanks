@@ -2,7 +2,14 @@
 
 import math
 
-from tanks.config.constants import SHOOT_COOLDOWN, TANK_MAX_HP, TANK_RADIUS
+from tanks.config.constants import (
+    RADAR_JAMMING_COOLDOWN,
+    RADAR_JAMMING_DURATION,
+    RADAR_SWEEP_SPEED,
+    SHOOT_COOLDOWN,
+    TANK_MAX_HP,
+    TANK_RADIUS,
+)
 from tanks.entities.entity import Entity
 
 
@@ -37,7 +44,19 @@ class Tank(Entity):
         # Perception (filled by perception system)
         self.visible_entities = []
         self.radar_detections = []  # List of (entity, distance, angle)
+        self.previous_radar_entities = set()  # Track entities for sound triggers
         self.fog_memory = None
+
+        # Radar sweep and blips
+        self.radar_sweep_angle = 0.0  # Current angle of radar sweep (clockwise in screen coords)
+        self.prev_radar_sweep_angle = 0.0  # Previous frame's sweep angle for crossing detection
+        # Radar blips store: entity reference, timestamp, angle, snapshot x/y, entity type
+        self.radar_blips = []
+
+        # Radar jamming
+        self.jamming_active = False  # Is jamming currently active
+        self.jamming_timer = 0.0  # Time remaining for active jamming
+        self.jamming_cooldown = 0.0  # Cooldown before next jamming use
 
     def update(self, dt: float) -> None:
         """Update tank state.
@@ -49,6 +68,24 @@ class Tank(Entity):
         # Update cooldown
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= dt
+
+        # Update radar sweep (clockwise in screen coordinates)
+        self.prev_radar_sweep_angle = self.radar_sweep_angle  # Store previous for crossing detection
+        self.radar_sweep_angle += RADAR_SWEEP_SPEED * dt
+        full_circle = 360
+        if self.radar_sweep_angle >= full_circle:
+            self.radar_sweep_angle -= full_circle
+            # Note: prev_angle stays at ~360, current is near 0 - wraparound handled in detection logic
+
+        # Update jamming timers
+        if self.jamming_active:
+            self.jamming_timer -= dt
+            if self.jamming_timer <= 0:
+                self.jamming_active = False
+                self.jamming_cooldown = RADAR_JAMMING_COOLDOWN
+
+        if self.jamming_cooldown > 0:
+            self.jamming_cooldown -= dt
 
     def take_damage(self, amount: float) -> bool:
         """Take damage and return True if destroyed.
@@ -111,3 +148,25 @@ class Tank(Entity):
 
         """
         return self.team != other_tank.team
+
+    def can_jam_radar(self) -> bool:
+        """Check if tank can activate radar jamming.
+
+        Returns:
+            True if jamming is available, False if on cooldown or already active.
+
+        """
+        return not self.jamming_active and self.jamming_cooldown <= 0
+
+    def activate_jamming(self) -> bool:
+        """Activate radar jamming.
+
+        Returns:
+            True if jamming was activated, False if unavailable.
+
+        """
+        if self.can_jam_radar():
+            self.jamming_active = True
+            self.jamming_timer = RADAR_JAMMING_DURATION
+            return True
+        return False
