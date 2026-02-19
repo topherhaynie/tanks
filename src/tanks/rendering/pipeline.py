@@ -34,6 +34,7 @@ class RenderPipeline:
         minimap_renderer: Any,
         debug_renderer: Any,
         hud_renderer: Any,
+        projectile_renderer: Any,
     ) -> None:
         """Initialize pipeline with renderer dependencies.
 
@@ -47,6 +48,7 @@ class RenderPipeline:
             minimap_renderer: Renderer for minimap overlays.
             debug_renderer: Renderer for debug overlays.
             hud_renderer: Renderer for HUD elements.
+            projectile_renderer: Renderer for missiles and mines.
 
         """
         self._map_renderer = map_renderer
@@ -58,6 +60,7 @@ class RenderPipeline:
         self._minimap_renderer = minimap_renderer
         self._debug_renderer = debug_renderer
         self._hud_renderer = hud_renderer
+        self._projectile_renderer = projectile_renderer
 
     def render(self, context: RenderContext) -> None:
         """Render a full frame's worth of layers.
@@ -99,7 +102,7 @@ class RenderPipeline:
         self._render_debug_and_hud(context)
 
     def _render_entities(self, context: RenderContext) -> None:
-        """Render bullets and tanks with appropriate visibility filtering.
+        """Render bullets, missiles, mines and tanks with appropriate visibility filtering.
 
         Args:
             context: Render inputs for this frame.
@@ -107,6 +110,14 @@ class RenderPipeline:
         """
         if context.observer_tanks:
             self._bullet_renderer.render_all(context.game_state.bullets, context.camera)
+            self._projectile_renderer.render_all_missiles(
+                context.game_state.missiles,
+                context.camera,
+            )
+            self._projectile_renderer.render_all_mines(
+                context.game_state.mines,
+                context.camera,
+            )
             self._tank_renderer.render_observer(
                 context.game_state.tanks,
                 context.observer_tanks,
@@ -119,6 +130,16 @@ class RenderPipeline:
                 context.perspective_tank,
                 context.camera,
             )
+            self._projectile_renderer.render_visible_missiles(
+                context.game_state.missiles,
+                context.perspective_tank,
+                context.camera,
+            )
+            self._projectile_renderer.render_visible_mines(
+                context.game_state.mines,
+                context.perspective_tank,
+                context.camera,
+            )
             self._tank_renderer.render_visible(
                 context.game_state.tanks,
                 context.perspective_tank,
@@ -126,6 +147,14 @@ class RenderPipeline:
             )
         else:
             self._bullet_renderer.render_all(context.game_state.bullets, context.camera)
+            self._projectile_renderer.render_all_missiles(
+                context.game_state.missiles,
+                context.camera,
+            )
+            self._projectile_renderer.render_all_mines(
+                context.game_state.mines,
+                context.camera,
+            )
             self._tank_renderer.render_all(context.game_state.tanks, context.camera)
 
     def _render_fog(self, context: RenderContext) -> None:
@@ -172,6 +201,7 @@ class RenderPipeline:
 
         if context.perspective_tank:
             self._hud_renderer.render_jamming_status(context.perspective_tank)
+            self._hud_renderer.render_weapon_status(context.perspective_tank)
 
         if context.settings.show_stats and context.stats_tracker:
             self._hud_renderer.render_stats_overlay(

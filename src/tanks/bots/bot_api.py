@@ -36,6 +36,9 @@ class SelfState:
     speed: float
     hp: int
     shoot_cooldown: float
+    missile_cooldown: float
+    mine_cooldown: float
+    mine_count: int
     team: int
 
 
@@ -90,6 +93,8 @@ class BotAction:
     turret_left: bool = False
     turret_right: bool = False
     shoot: bool = False
+    fire_missile: bool = False
+    place_mine: bool = False
     desired_turret_angle: float | None = None
 
 

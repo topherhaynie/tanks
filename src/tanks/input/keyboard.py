@@ -16,7 +16,10 @@ class KeyboardController(Controller):
     """Keyboard-based tank controller."""
 
     def __init__(
-        self, tank: "Tank", game: "Game", key_bindings: dict[str, int] | None = None
+        self,
+        tank: "Tank",
+        game: "Game",
+        key_bindings: dict[str, int] | None = None,
     ) -> None:
         """Create a keyboard controller.
 
@@ -36,6 +39,8 @@ class KeyboardController(Controller):
                 "turn_left": pygame.K_a,
                 "turn_right": pygame.K_d,
                 "shoot": pygame.K_SPACE,
+                "fire_missile": pygame.K_m,
+                "place_mine": pygame.K_n,
                 "jam": pygame.K_j,
             }
 
@@ -78,6 +83,14 @@ class KeyboardController(Controller):
         if keys[self.key_bindings["shoot"]]:
             self.game.shoot_bullet(self.tank)
 
+        # Missile firing
+        if keys[self.key_bindings["fire_missile"]]:
+            self.game.fire_missile(self.tank)
+
+        # Mine placement
+        if keys[self.key_bindings["place_mine"]]:
+            self.game.place_mine(self.tank)
+
         # Radar jamming (single activation on key press)
         jam_key_pressed = keys[self.key_bindings["jam"]]
         if (
@@ -108,6 +121,8 @@ class KeyboardController2(Controller):
             "turn_left": pygame.K_LEFT,
             "turn_right": pygame.K_RIGHT,
             "shoot": pygame.K_RCTRL,
+            "fire_missile": pygame.K_BACKSLASH,
+            "place_mine": pygame.K_EQUALS,
             "jam": pygame.K_RSHIFT,
         }
 
@@ -152,6 +167,14 @@ class KeyboardController2(Controller):
         # Shooting
         if keys[self.key_bindings["shoot"]]:
             self.game.shoot_bullet(self.tank)
+
+        # Missile firing
+        if keys[self.key_bindings["fire_missile"]]:
+            self.game.fire_missile(self.tank)
+
+        # Mine placement
+        if keys[self.key_bindings["place_mine"]]:
+            self.game.place_mine(self.tank)
 
         # Radar jamming (single activation on key press)
         jam_key_pressed = keys[self.key_bindings["jam"]]

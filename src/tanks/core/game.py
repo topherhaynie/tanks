@@ -9,6 +9,7 @@ import pygame
 from tanks.config.constants import (
     FPS,
     INPUT_RATE,
+    MISSILE_SPEED,
     PHYSICS_RATE,
     WINDOW_HEIGHT,
     WINDOW_TITLE,
@@ -19,7 +20,7 @@ from tanks.core.clock import FixedClock
 from tanks.core.events import EventSystem
 from tanks.core.stats import StatsTracker
 from tanks.effects.visual import MuzzleFlash, VisualEffect
-from tanks.entities import Bullet, Tank
+from tanks.entities import Bullet, Mine, Missile, Tank
 from tanks.maps import MapLoader
 from tanks.perception import RadarSystem, TerrainMemory, VisionSystem
 from tanks.physics import CollisionSystem, MovementSystem, ProjectileSystem
@@ -42,6 +43,8 @@ class GameState:
         """Initialize game state."""
         self.tanks: list[Tank] = []
         self.bullets: list[Bullet] = []
+        self.missiles: list[Missile] = []
+        self.mines: list[Mine] = []
         self.effects: list[VisualEffect] = []
         self.game_map = None
         self.fps: float = 0
@@ -264,6 +267,110 @@ class Game:
             if not bullet.active:
                 self.state.bullets.remove(bullet)
 
+        # Update missiles
+        for missile in self.state.missiles[:]:
+            missile.update(dt)
+
+            # Check wall collisions (missiles don't bounce)
+            hit_wall = self.collision_system.check_missile_wall_collision(missile)
+            if hit_wall:
+                missile.destroy()
+                if self.sound_manager:
+                    self.sound_manager.play_hit()
+
+            # Check tank collisions
+            if missile.active:
+                hit_tank = self.collision_system.check_missile_tank_collision(
+                    missile,
+                    self.state.tanks,
+                )
+                if hit_tank:
+                    # Find shooter tank for stats
+                    shooter_tank = next(
+                        (t for t in self.state.tanks if t.id == missile.owner_id),
+                        None,
+                    )
+
+                    # Record hit and damage
+                    if shooter_tank:
+                        self.stats_tracker.record_hit(
+                            shooter_tank,
+                            hit_tank,
+                            missile.damage,
+                        )
+
+                    # Apply damage and check for kill
+                    was_destroyed = hit_tank.take_damage(missile.damage)
+                    if was_destroyed and shooter_tank:
+                        self.stats_tracker.record_kill(shooter_tank, hit_tank)
+
+                    missile.destroy()
+                    if self.sound_manager:
+                        self.sound_manager.play_hit()
+
+            # Remove inactive missiles
+            if not missile.active:
+                self.state.missiles.remove(missile)
+
+        # Update mines
+        for mine in self.state.mines[:]:
+            mine.update(dt)
+
+            # Check proximity to tanks
+            hit_tank = self.collision_system.check_mine_proximity(
+                mine, self.state.tanks
+            )
+            if hit_tank:
+                mine.trigger()
+
+            # Check collision with projectiles
+            if mine.armed and mine.active:
+                hit_projectile = (
+                    self.collision_system.check_mine_collision_with_projectile(
+                        mine,
+                        self.state.bullets + self.state.missiles,
+                    )
+                )
+                if hit_projectile:
+                    mine.trigger()
+                    hit_projectile.destroy()
+
+            # Handle mine explosion
+            if not mine.active:
+                # Find owner tank for stats
+                owner_tank = next(
+                    (t for t in self.state.tanks if t.id == mine.owner_id),
+                    None,
+                )
+
+                # Check if mine hit anyone (within blast radius)
+                from tanks.config.constants import MINE_BLAST_RADIUS
+
+                for tank in self.state.tanks:
+                    if tank.id == mine.owner_id:
+                        continue  # Don't damage owner
+
+                    dx = tank.x - mine.x
+                    dy = tank.y - mine.y
+                    dist = (dx * dx + dy * dy) ** 0.5
+
+                    if dist < MINE_BLAST_RADIUS:
+                        if owner_tank:
+                            self.stats_tracker.record_hit(
+                                owner_tank,
+                                tank,
+                                mine.damage,
+                            )
+
+                        was_destroyed = tank.take_damage(mine.damage)
+                        if was_destroyed and owner_tank:
+                            self.stats_tracker.record_kill(owner_tank, tank)
+
+                        if self.sound_manager:
+                            self.sound_manager.play_hit()
+
+                self.state.mines.remove(mine)
+
         # Update visual effects
         for effect in self.state.effects[:]:
             effect.update(dt)
@@ -287,8 +394,13 @@ class Game:
         if not self.vision_system:
             return
 
-        # Collect all entities (tanks + bullets)
-        all_entities = list(self.state.tanks) + list(self.state.bullets)
+        # Collect all entities (tanks + bullets + missiles + mines)
+        all_entities = (
+            list(self.state.tanks)
+            + list(self.state.bullets)
+            + list(self.state.missiles)
+            + list(self.state.mines)
+        )
 
         for tank in self.state.tanks:
             if not tank.active:
@@ -425,6 +537,65 @@ class Game:
                 self.sound_manager.play_shoot()
 
             return bullet
+        return None
+
+    def fire_missile(self, tank: Tank) -> Missile | None:
+        """Create a missile from a tank.
+
+        Args:
+            tank: Tank that is firing missile.
+
+        Returns:
+            Created missile or None if on cooldown.
+
+        """
+        if tank.fire_missile():
+            # Record missile fired
+            self.stats_tracker.record_shot(tank)
+
+            tip_x, tip_y = tank.get_turret_tip_position()
+
+            angle_rad = math.radians(tank.turret_angle)
+            vx = math.cos(angle_rad) * MISSILE_SPEED
+            vy = math.sin(angle_rad) * MISSILE_SPEED
+
+            missile = Missile(tip_x, tip_y, vx, vy, tank.id)
+            self.state.missiles.append(missile)
+
+            # Create muzzle flash effect
+            muzzle_flash = MuzzleFlash(tip_x, tip_y, tank.turret_angle)
+            self.state.effects.append(muzzle_flash)
+
+            # Play shoot sound
+            if self.sound_manager:
+                self.sound_manager.play_shoot()
+
+            return missile
+        return None
+
+    def place_mine(self, tank: Tank) -> Mine | None:
+        """Create a mine from a tank.
+
+        Args:
+            tank: Tank that is placing mine.
+
+        Returns:
+            Created mine or None if at max or on cooldown.
+
+        """
+        if tank.place_mine():
+            # Record mine placed
+            self.stats_tracker.record_shot(tank)
+
+            # Place mine at tank position
+            mine = Mine(tank.x, tank.y, tank.id)
+            self.state.mines.append(mine)
+
+            # Play place sound (reusing shoot sound for now)
+            if self.sound_manager:
+                self.sound_manager.play_shoot()
+
+            return mine
         return None
 
     def display_final_stats(self) -> None:

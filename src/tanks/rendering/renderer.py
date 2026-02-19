@@ -14,6 +14,7 @@ from tanks.rendering.hud import HudRenderer
 from tanks.rendering.map_renderer import MapRenderer
 from tanks.rendering.minimap import MinimapRenderer
 from tanks.rendering.pipeline import RenderContext, RenderPipeline
+from tanks.rendering.projectiles import ProjectileRenderer
 from tanks.rendering.radar import RadarRenderer
 from tanks.rendering.tanks import TankRenderer
 
@@ -51,6 +52,7 @@ class Renderer:
         self.hud_renderer = HudRenderer(self.screen, self.small_font)
         self.tank_renderer = TankRenderer(self.screen)
         self.bullet_renderer = BulletRenderer(self.screen)
+        self.projectile_renderer = ProjectileRenderer(self.screen)
         self.map_renderer = MapRenderer(self.screen)
         self.debug_renderer = DebugRenderer(self.screen)
         self.effects_renderer = EffectsRenderer(self.screen)
@@ -66,6 +68,7 @@ class Renderer:
             self.minimap_renderer,
             self.debug_renderer,
             self.hud_renderer,
+            self.projectile_renderer,
         )
 
     def render_frame(self, game_state: Any, camera: Any) -> None:

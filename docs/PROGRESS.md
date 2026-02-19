@@ -462,22 +462,191 @@ None - Phase 4 Complete! ✅
 ## Known Issues
 None currently identified.
 
+---
 
-### Planned Features
-- [ ] **Mines**: Deployable explosives detectable by radar
-    - Placeable action (cooldown ~5 seconds)
-    - Limited capacity per tank (3 mines max)
-    - Damage radius on detonation
-    - Trigger on proximity or bullet/missile impact
-    - Persist on map until triggered
-    - Show as radar blips (detectable by enemy)
-- [ ] **Missiles**: Fast, high-damage projectiles
-    - 2-3x bullet speed
-    - No ricochet (explode on first impact)
-    - Higher damage (e.g., 50 vs 25 for bullets)
-    - Longer cooldown (3-5 seconds)
-    - Separate missile action
-- [ ] **Weapon selection UI**: Display available weapons and cooldowns
+# Phase 5 Progress - Expanded Weapon System
+
+**Status**: ✅ COMPLETE
+
+## Completed Features
+
+### Missile Implementation
+- [x] Missile entity class with swept collision detection
+- [x] Fast projectiles (600 px/s = 1.5x bullet speed)
+- [x] No ricochet - explode on first wall impact
+- [x] Higher damage (2 vs 1 for bullets)
+- [x] 3-second cooldown between shots
+- [x] Collision with walls (immediate destruction)
+- [x] Collision with tanks (apply damage)
+- [x] Sensor integration (missiles visible to radar/vision)
+- [x] Rendering (orange colored projectiles)
+
+### Mine Implementation
+- [x] Mine entity class with proximity trigger
+- [x] Deployable at tank position (not fired)
+- [x] 3-mine maximum capacity per tank
+- [x] 5-second placement cooldown
+- [x] 1-second arm delay (prevents triggering on placer)
+- [x] Proximity trigger radius (40px)
+- [x] Blast radius damage (60px) - hits all nearby tanks
+- [x] Higher damage (3 vs 1 for bullets)
+- [x] Trigger on tank proximity OR projectile impact
+- [x] Sensor integration (mines visible to radar/vision)
+- [x] Rendering (purple colored circles)
+
+### Game System Integration
+- [x] Game state tracks missiles and mines (GameState lists)
+- [x] Physics updates for both projectile types
+- [x] Collision detection (wall, tank, mine proximity)
+- [x] Stats tracking integration (hits, kills with new weapons)
+- [x] Perception system includes missiles/mines in entity lists
+- [x] Mine blast radius damage to all enemy tanks in range
+
+### Tank Weapon Management
+- [x] Missile cooldown tracking (missile_cooldown)
+- [x] Mine cooldown tracking (mine_cooldown)
+- [x] Mine ammo counter (mine_count 0-3)
+- [x] Tank methods: can_fire_missile(), fire_missile()
+- [x] Tank methods: can_place_mine(), place_mine(), refill_mines()
+- [x] Weapon state in tank update loop
+
+### Bot API Extensions
+- [x] BotState includes missile_cooldown, mine_cooldown, mine_count
+- [x] BotAction includes fire_missile, place_mine flags
+- [x] Sensor system detects missiles as "missile" kind
+- [x] Sensor system detects mines as "mine" kind
+- [x] Radar includes missiles and mines in radar_hits
+- [x] Vision includes missiles and mines in visible_entities
+
+### Gameplay Controls
+- [x] Keyboard: M key for missile firing (Player 1: WASD+M)
+- [x] Keyboard: N key for mine placement (Player 1: WASD+N)
+- [x] Keyboard: Backslash (\) for missile (Player 2: Arrows+\)
+- [x] Keyboard: Plus (=) for mine (Player 2: Arrows+=)
+- [x] Bot controllers automatically handle new actions
+- [x] External bot protocol supports new weapons
+
+### UI Display
+- [x] Weapon status HUD showing cooldowns and ammo
+- [x] Bullet status: Ready/Cooldown duration
+- [x] Missile status: Ready/Cooldown duration (cyan color)
+- [x] Mine status: X/3 mines, Ready/Cooldown (magenta color)
+- [x] Dynamic color coding (green=ready, gray=cooldown)
+- [x] Integrated into existing HUD rendering pipeline
+- [x] Displays below jamming status indicator
+
+### Game Constants
+- [x] MISSILE_SPEED = 600 px/s
+- [x] MISSILE_RADIUS = 6 px
+- [x] MISSILE_DAMAGE = 2
+- [x] MISSILE_LIFETIME = 5.0 seconds
+- [x] MISSILE_COOLDOWN = 3.0 seconds
+- [x] MAX_MISSILES = 1 (one in flight per tank)
+- [x] MINE_RADIUS = 8 px
+- [x] MINE_BLAST_RADIUS = 60 px
+- [x] MINE_DAMAGE = 3
+- [x] MINE_PLACEMENT_COOLDOWN = 5.0 seconds
+- [x] MINE_MAX_COUNT = 3
+- [x] MINE_TRIGGER_RADIUS = 40 px
+- [x] COLOR_MISSILE = (255, 100, 50) orange
+- [x] COLOR_MINE = (200, 50, 200) magenta
+
+### Rendering System
+- [x] ProjectileRenderer class for missiles and mines
+- [x] render_all_missiles() with viewport culling
+- [x] render_all_mines() with viewport culling
+- [x] render_visible_missiles() with fog filtering
+- [x] render_visible_mines() with fog filtering
+- [x] Integration with RenderPipeline
+- [x] Integration with all camera modes
+- [x] Zoom scaling for missiles and mines
+- [x] HUD weapon status display
+
+### Physics & Collision
+- [x] Swept collision for missiles (fast movement)
+- [x] Wall collision detection (immediate destruction)
+- [x] Tank collision detection (apply damage)
+- [x] Mine proximity detection (enemy tanks)
+- [x] Mine impact trigger (from bullets/missiles)
+- [x] Blast radius damage calculations
+- [x] Mine arm delay to prevent self-trigger
+- [x] Viewport culling optimization
+
+### Code Quality
+- [x] Full type annotations throughout
+- [x] Google-style docstrings
+- [x] Passes Ruff linting
+- [x] Organized into appropriate modules
+- [x] Consistent with existing code style
+- [x] Backward compatible with Phase 4
+
+## Phase 5 Implementation Details
+
+### Missile Architecture
+- Inherits from Entity like Bullet
+- Stores owner_id for tracking shooter
+- Uses swept collision detection (prev_x, prev_y)
+- Immediate destruction on wall collision (no bounce)
+- Higher speed allows strategic long-range attacks
+- 1-shot maximum per cooldown (tactical limitation)
+
+### Mine Architecture
+- Inherits from Entity
+- Stores owner_id for non-friendly triggering
+- 1-second armed delay prevents immediate self-trigger
+- Stationary on map (no velocity)
+- Blast radius affects all non-friendly tanks at detonation
+- Can be triggered by player fire (mines for static defense)
+- Ammo-limited (3 max) for balancing
+- Works in fog (visible through radar)
+
+### Collision System
+- check_missile_wall_collision() - swept detection
+- check_missile_tank_collision() - circle-circle test
+- check_mine_proximity() - distance-based trigger
+- check_mine_collision_with_projectile() - projectile impact
+- All checks respect ownership (no friendly fire)
+
+### Perception Integration
+- Mines appear in visible_entities if in vision
+- Missiles appear in visible_entities if in vision
+- Both detectable by radar (600px range, team-filtered)
+- Included in sensor snapshots for bots
+- Kind strings: "missile", "mine" for identification
+
+## Testing Notes
+- Game starts without errors
+- Syntax validation passed
+- All imports resolve correctly
+- Backward compatible with existing code
+- Demo modes work with new weapons
+- HUD displays weapon status correctly
+
+## Known Issues
+None currently identified.
+
+## Future Enhancements
+- [ ] **Weapon Upgrades**: Temporary power-ups for increased weapon power
+- [ ] **Homing Missiles**: Guided missiles that track enemies
+- [ ] **Shield Boost**: Temporary damage reduction
+- [ ] **Ammo Drops**: Random pickups on map for mine/missile refills
+- [ ] **Laser**: Instant-hit hitscan weapon with line effect
+- [ ] **Grenade Launcher**: Arc projectile with impact detonation
+
+## Phase 5 Review
+All objectives met. Weapon system is balanced and integrated with:
+- Two new weapon types (missiles and mines)
+- Complete physics and collision handling
+- Full sensor system integration
+- Proper UI feedback and control bindings
+- Stats tracking for new weapons
+- Backward compatibility with existing code
+- Clean architecture supporting future weapon additions
+
+---
+
+
+### Planned Features (Future Phases)
 - [ ] **Bot API extension**: Add mine_placement and shoot_missile actions to BotAction
 - [ ] **Sensor updates**: Mines visible to radar in BotState.radar_hits
 

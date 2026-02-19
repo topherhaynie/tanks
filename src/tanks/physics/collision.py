@@ -193,6 +193,126 @@ class CollisionSystem:
 
         return None
 
+    def check_missile_wall_collision(self, missile):
+        """Check if missile hits a wall using swept collision detection.
+
+        Missiles don't bounce, so any wall hit is fatal.
+        Returns True if hit, False otherwise.
+
+        """
+        from ..utils.geometry import line_line_intersection
+
+        # Check tiles along missile's path
+        tiles_current = self._get_nearby_tiles(missile.x, missile.y, missile.radius)
+        tiles_prev = self._get_nearby_tiles(
+            missile.prev_x, missile.prev_y, missile.radius
+        )
+        tiles_to_check = list(set(tiles_current + tiles_prev))
+
+        for tile in tiles_to_check:
+            tx, ty, tile_type = tile
+            edges = self._get_tile_edges(tx, ty, tile_type)
+
+            for edge in edges:
+                x1, y1, x2, y2 = edge
+
+                # Check if missile's movement path crosses the edge
+                move_dist_sq = (missile.x - missile.prev_x) ** 2 + (
+                    missile.y - missile.prev_y
+                )
+                if (
+                    move_dist_sq > 1
+                ):  # Only do swept check if missile moved significantly
+                    hit_swept, intersection = line_line_intersection(
+                        missile.prev_x,
+                        missile.prev_y,
+                        missile.x,
+                        missile.y,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                    )
+                    if hit_swept and intersection:
+                        return True
+
+                # Fallback: circle-line collision
+                hit_circle, _ = line_circle_intersection(
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    missile.x,
+                    missile.y,
+                    missile.radius,
+                )
+                if hit_circle:
+                    return True
+
+        return False
+
+    def check_missile_tank_collision(self, missile, tanks):
+        """Check if missile hits any tank.
+
+        Returns the tank that was hit, or None.
+
+        """
+        for tank in tanks:
+            # Skip inactive or friendly fire
+            if not tank.active or tank.id == missile.owner_id:
+                continue
+
+            if circle_circle_collision(
+                missile.x,
+                missile.y,
+                missile.radius,
+                tank.x,
+                tank.y,
+                tank.radius,
+            ):
+                return tank
+
+        return None
+
+    def check_mine_proximity(self, mine, tanks):
+        """Check if any tank triggers mine proximity.
+
+        Returns the tank that triggered it, or None.
+
+        """
+        for tank in tanks:
+            # Skip inactive or owner
+            if not tank.active or tank.id == mine.owner_id:
+                continue
+
+            if mine.check_proximity(tank.x, tank.y):
+                return tank
+
+        return None
+
+    def check_mine_collision_with_projectile(self, mine, projectiles):
+        """Check if any projectile (bullet/missile) triggers mine.
+
+        Returns the projectile that triggered it, or None.
+
+        """
+        for proj in projectiles:
+            # Skip inactive or owner's projectiles
+            if not proj.active or proj.owner_id == mine.owner_id:
+                continue
+
+            if circle_circle_collision(
+                proj.x,
+                proj.y,
+                proj.radius,
+                mine.x,
+                mine.y,
+                mine.radius,
+            ):
+                return proj
+
+        return None
+
     def _get_nearby_tiles(self, x, y, radius):
         """Get tiles near a position (for optimized collision checking)."""
         if not self.map:

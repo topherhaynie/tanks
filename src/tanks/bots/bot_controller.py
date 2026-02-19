@@ -60,6 +60,12 @@ class BotController(Controller):
         if action.shoot:
             self.game.shoot_bullet(self.tank)
 
+        if action.fire_missile:
+            self.game.fire_missile(self.tank)
+
+        if action.place_mine:
+            self.game.place_mine(self.tank)
+
     def _apply_turret_action(self, action: BotAction, dt: float) -> None:
         if action.desired_turret_angle is not None:
             target_degrees = math.degrees(action.desired_turret_angle)

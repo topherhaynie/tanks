@@ -37,6 +37,22 @@ BULLET_LIFETIME = 3.0  # seconds
 SHOOT_COOLDOWN = 0.5  # seconds between shots
 MAX_BULLET_BOUNCES = 1
 
+# Missile Parameters
+MISSILE_SPEED = 600  # pixels per second (1.5x bullet speed)
+MISSILE_RADIUS = 6  # pixels
+MISSILE_DAMAGE = 2
+MISSILE_LIFETIME = 5.0  # seconds
+MISSILE_COOLDOWN = 3.0  # seconds between shots
+MAX_MISSILES = 1  # Only one missile can be in flight at a time
+
+# Mine Parameters
+MINE_RADIUS = 8  # pixels
+MINE_BLAST_RADIUS = 60  # pixels - explosion damage radius
+MINE_DAMAGE = 3
+MINE_PLACEMENT_COOLDOWN = 5.0  # seconds between placements
+MINE_MAX_COUNT = 3  # Maximum mines per tank
+MINE_TRIGGER_RADIUS = 40  # pixels - proximity trigger radius
+
 # Vision System
 VISION_RADIUS = 150  # pixels - fog revelation range (active vision)
 ENTITY_VISION_RADIUS = 600  # pixels - extended entity vision through revealed areas
@@ -63,6 +79,8 @@ COLOR_WALL = (100, 100, 120)
 COLOR_TANK_FRIENDLY = (50, 150, 50)
 COLOR_TANK_ENEMY = (200, 50, 50)
 COLOR_BULLET = (255, 255, 100)
+COLOR_MISSILE = (255, 100, 50)  # Orange for missiles
+COLOR_MINE = (200, 50, 200)  # Purple for mines
 COLOR_FOG = (0, 0, 0, 255)  # With alpha - very dark
 COLOR_VISION_OVERLAY = (100, 255, 100, 30)
 COLOR_RADAR_OVERLAY = (100, 100, 255, 20)

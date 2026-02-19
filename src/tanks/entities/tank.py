@@ -3,6 +3,9 @@
 import math
 
 from tanks.config.constants import (
+    MINE_MAX_COUNT,
+    MINE_PLACEMENT_COOLDOWN,
+    MISSILE_COOLDOWN,
     RADAR_JAMMING_COOLDOWN,
     RADAR_JAMMING_DURATION,
     RADAR_SWEEP_SPEED,
@@ -36,6 +39,9 @@ class Tank(Entity):
         self.hp = TANK_MAX_HP
         self.max_hp = TANK_MAX_HP
         self.shoot_cooldown = 0
+        self.missile_cooldown = 0
+        self.mine_cooldown = 0
+        self.mine_count = MINE_MAX_COUNT
         self.team = team
 
         # Control (for bots/players)
@@ -69,9 +75,13 @@ class Tank(Entity):
             dt: Time delta in seconds.
 
         """
-        # Update cooldown
+        # Update cooldowns
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= dt
+        if self.missile_cooldown > 0:
+            self.missile_cooldown -= dt
+        if self.mine_cooldown > 0:
+            self.mine_cooldown -= dt
 
         # Update radar sweep (clockwise in screen coordinates)
         self.prev_radar_sweep_angle = (
@@ -130,6 +140,53 @@ class Tank(Entity):
             self.shoot_cooldown = SHOOT_COOLDOWN
             return True
         return False
+
+    def can_fire_missile(self) -> bool:
+        """Check if tank can fire a missile.
+
+        Returns:
+            True if tank can fire missile, False if on cooldown.
+
+        """
+        return self.missile_cooldown <= 0
+
+    def fire_missile(self) -> bool:
+        """Trigger missile fire (sets cooldown).
+
+        Returns:
+            True if missile was fired, False if on cooldown.
+
+        """
+        if self.can_fire_missile():
+            self.missile_cooldown = MISSILE_COOLDOWN
+            return True
+        return False
+
+    def can_place_mine(self) -> bool:
+        """Check if tank can place a mine.
+
+        Returns:
+            True if tank has mines left and cooldown is expired.
+
+        """
+        return self.mine_count > 0 and self.mine_cooldown <= 0
+
+    def place_mine(self) -> bool:
+        """Trigger mine placement (decrements count and sets cooldown).
+
+        Returns:
+            True if mine was placed, False if no mines or on cooldown.
+
+        """
+        if self.can_place_mine():
+            self.mine_count -= 1
+            self.mine_cooldown = MINE_PLACEMENT_COOLDOWN
+            return True
+        return False
+
+    def refill_mines(self) -> None:
+        """Refill mines to maximum capacity."""
+        self.mine_count = MINE_MAX_COUNT
 
     def get_turret_tip_position(self) -> tuple[float, float]:
         """Get the position of the turret tip (where bullets spawn).

@@ -313,7 +313,10 @@ class VisionSystem:
                 target_fty = tank_fty + dy
 
                 # Check if fog tile is in bounds
-                if not (0 <= target_ftx < tank.fog_memory.fog_width and 0 <= target_fty < tank.fog_memory.fog_height):
+                if not (
+                    0 <= target_ftx < tank.fog_memory.fog_width
+                    and 0 <= target_fty < tank.fog_memory.fog_height
+                ):
                     continue
 
                 # Check distance
@@ -402,7 +405,10 @@ class VisionSystem:
                 # Reveal fog tiles that overlap with this wall, but only if within vision radius
                 for wall_fty in range(wall_fty_min, wall_fty_max + 1):
                     for wall_ftx in range(wall_ftx_min, wall_ftx_max + 1):
-                        if 0 <= wall_ftx < fog_memory.fog_width and 0 <= wall_fty < fog_memory.fog_height:
+                        if (
+                            0 <= wall_ftx < fog_memory.fog_width
+                            and 0 <= wall_fty < fog_memory.fog_height
+                        ):
                             # Check if this fog tile's center is within vision radius
                             fog_center_x = (wall_ftx + 0.5) * FOG_TILE_SIZE
                             fog_center_y = (wall_fty + 0.5) * FOG_TILE_SIZE
@@ -414,7 +420,10 @@ class VisionSystem:
                                 fog_memory.reveal_tile(wall_ftx, wall_fty)
 
                 # Vision is blocked - check if target is part of this wall
-                return wall_ftx_min <= target_ftx <= wall_ftx_max and wall_fty_min <= target_fty <= wall_fty_max
+                return (
+                    wall_ftx_min <= target_ftx <= wall_ftx_max
+                    and wall_fty_min <= target_fty <= wall_fty_max
+                )
 
             # No wall at this position - reveal the fog tile here
             ftx = int(check_x / FOG_TILE_SIZE)

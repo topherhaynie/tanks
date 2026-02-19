@@ -44,6 +44,9 @@ def build_bot_state(tank: "Tank", game: "Game", tick_id: int, dt: float) -> BotS
         speed=tank.speed if hasattr(tank, "speed") else 0.0,
         hp=tank.hp,
         shoot_cooldown=tank.shoot_cooldown,
+        missile_cooldown=tank.missile_cooldown,
+        mine_cooldown=tank.mine_cooldown,
+        mine_count=tank.mine_count,
         team=tank.team,
     )
 
@@ -118,7 +121,8 @@ def _relative_bearing(tank: "Tank", dx: float, dy: float) -> float:
     absolute_angle = math.atan2(dy, dx)
     tank_angle = math.radians(tank.angle)
     return math.atan2(
-        math.sin(absolute_angle - tank_angle), math.cos(absolute_angle - tank_angle)
+        math.sin(absolute_angle - tank_angle),
+        math.cos(absolute_angle - tank_angle),
     )
 
 
@@ -128,6 +132,8 @@ def _entity_kind(entity: "Entity") -> str:
         return "tank"
     if name == "mine":
         return "mine"
+    if name == "missile":
+        return "missile"
     if name == "bullet":
         return "bullet"
     return "obstacle"

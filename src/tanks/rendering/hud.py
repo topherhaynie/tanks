@@ -61,6 +61,51 @@ class HudRenderer:
         text_surface = self._small_font.render(status_text, True, color)
         self._screen.blit(text_surface, (10, y_offset))
 
+    def render_weapon_status(self, tank: "Tank") -> None:
+        """Render weapon cooldowns and ammo for perspective tank.
+
+        Args:
+            tank: Tank to show weapon status for.
+
+        """
+        if not tank.active:
+            return
+
+        y_offset = 60  # Below jamming status
+        line_height = 20
+
+        # Bullet cooldown
+        color = (100, 255, 100) if tank.shoot_cooldown <= 0 else (150, 150, 150)
+        bullet_text = (
+            "Bullets: Ready (Space)"
+            if tank.shoot_cooldown <= 0
+            else f"Bullets: {tank.shoot_cooldown:.1f}s"
+        )
+        text_surface = self._small_font.render(bullet_text, True, color)
+        self._screen.blit(text_surface, (10, y_offset))
+        y_offset += line_height
+
+        # Missile cooldown
+        color = (100, 200, 255) if tank.missile_cooldown <= 0 else (150, 150, 150)
+        missile_text = (
+            "Missiles: Ready (M)"
+            if tank.missile_cooldown <= 0
+            else f"Missiles: {tank.missile_cooldown:.1f}s"
+        )
+        text_surface = self._small_font.render(missile_text, True, color)
+        self._screen.blit(text_surface, (10, y_offset))
+        y_offset += line_height
+
+        # Mine status
+        color = (200, 100, 255) if tank.mine_cooldown <= 0 else (150, 150, 150)
+        mine_text = (
+            f"Mines: {tank.mine_count}/3 Ready (N)"
+            if tank.mine_cooldown <= 0
+            else f"Mines: {tank.mine_count}/3 Cooldown {tank.mine_cooldown:.1f}s"
+        )
+        text_surface = self._small_font.render(mine_text, True, color)
+        self._screen.blit(text_surface, (10, y_offset))
+
     def render_stats_overlay(
         self,
         stats_tracker: "StatsTracker",
