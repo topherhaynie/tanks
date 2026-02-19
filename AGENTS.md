@@ -166,6 +166,9 @@ max-complexity = 15  # Collision detection can be complex
 - `src/tanks/bots/cpp/` - C++ bot SDK and examples
 - `src/tanks/modes/` - Tournament and arena modes
 - `src/tanks/core/stats.py` - Performance metrics tracking
+- `src/tanks/rendering/camera.py` - Camera system (follow and global views)
+- `src/tanks/maps/generator.py` - Procedural map generation
+- `src/tanks/maps/loader.py` - Enhanced map loading and validation
 
 ### Configuration
 - `src/tanks/config/constants.py` - Tunable parameters (speeds, sizes, rates)
@@ -248,8 +251,12 @@ Focus areas:
 - `src/tanks/bots/cpp/` - C++ SDK with headers and examples
 - `src/tanks/modes/tournament.py` - Tournament framework
 - `src/tanks/core/stats.py` - Performance metrics (kills, deaths, accuracy)
+- `src/tanks/rendering/camera.py` - Camera system (follow and global views)
+- `src/tanks/maps/generator.py` - Procedural map generation
+- `src/tanks/maps/loader.py` - Enhanced map loading and validation
 - External bot timeout handling and watchdog
-- Map loader and arena mode
+- Camera modes: follow tank (single-player) and global view (observer/training)
+- Large map support with smooth scrolling
 
 ## Debugging Tips
 

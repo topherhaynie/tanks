@@ -275,7 +275,18 @@ All core objectives met. Bot framework is production-ready with:
 - [ ] **Bot performance metrics**: Stats tracking and display
 - [ ] **Tournament mode**: Match framework, scheduling, results
 - [ ] **Additional game modes**: Arena (multi-tank), objectives
-- [ ] **Map system**: Loader, generator, variety of arenas
+- [ ] **Camera System**: Support for larger maps
+    - Follow camera for single-player view (smooth tracking)
+    - Global camera for observer view (entire map visible)
+    - Pan and zoom controls
+    - Screen-space bounds with smooth scrolling
+- [ ] **Advanced Map System**: 
+    - Procedural map generator with parameters
+    - Multiple map sizes (small, medium, large)
+    - Varied terrain patterns (arena, maze, corridors, rooms)
+    - JSON map loader for custom maps
+    - Map validation and balance checks
+    - Tournament-ready map prefabs library
 
 ### Implementation Notes
 - External bots use JSON stdin/stdout per 06_Bot_API.md spec
@@ -283,3 +294,74 @@ All core objectives met. Bot framework is production-ready with:
 - 3-8ms timeout budget for external bots
 - C++ bots should match Python bot timing fairness
 - Consider performance metrics as foundation for tournament ranking
+- **Camera**: Renderer already has camera offset capability - extend for follow mode
+- **Camera**: Follow camera centers on player tank with smooth lerp
+- **Camera**: Global camera scales to fit entire map (for training/observer)
+- **Camera**: Basic Camera class already exists in `rendering/camera.py` - needs smooth follow and bounds
+- **Map generator**: Use procedural algorithms (BSP, cellular automata, or Perlin noise)
+- **Map sizes**: Current 20x11 tiles (1280x704px), extend to 40x22 (2560x1408px), 80x44+ for large
+- **Map validation**: Ensure all spawn points are reachable, no isolated areas
+
+---
+
+## Future: Phase 5 - Weapons & Items
+
+### Planned Features
+- [ ] **Mines**: Deployable explosives detectable by radar
+    - Placeable action (cooldown ~5 seconds)
+    - Limited capacity per tank (3 mines max)
+    - Damage radius on detonation
+    - Trigger on proximity or bullet/missile impact
+    - Persist on map until triggered
+    - Show as radar blips (detectable by enemy)
+- [ ] **Missiles**: Fast, high-damage projectiles
+    - 2-3x bullet speed
+    - No ricochet (explode on first impact)
+    - Higher damage (e.g., 50 vs 25 for bullets)
+    - Longer cooldown (3-5 seconds)
+    - Separate missile action
+- [ ] **Weapon selection UI**: Display available weapons and cooldowns
+- [ ] **Bot API extension**: Add mine_placement and shoot_missile actions to BotAction
+- [ ] **Sensor updates**: Mines visible to radar in BotState.radar_hits
+
+### Implementation Notes
+- Mines should be a new entity type (inherit from Entity)
+- Missiles can extend Bullet with higher speed, no bounce, higher damage
+- Need new collision handling for mine proximity triggers
+- Bot API needs new action flags: `place_mine: bool`, `shoot_missile: bool`
+- UI should show mine count and missile cooldown alongside bullet cooldown
+
+---
+
+## Future: Phase 6 - Reinforcement Learning & Self-Play
+
+### Planned Features
+- [ ] **Self-play training**: Bots learn by competing against copies of themselves
+- [ ] **Competitive co-evolution**: Multiple agents training simultaneously (dueling architecture)
+- [ ] **Reward system**: Damage dealt, survival time, kills, match victory
+- [ ] **Training infrastructure**: Episode management, checkpoint saving, resume training
+- [ ] **Neural network integration**: PyTorch or TensorFlow policy networks
+- [ ] **Experience replay buffer**: Store and sample battle episodes for training
+- [ ] **Dueling DQN**: Separate value and advantage network streams
+- [ ] **Policy gradient methods**: PPO, A3C, or similar for continuous action spaces
+- [ ] **Training visualization**: Reward curves, win rates, learning progress dashboards
+- [ ] **Automated training arena**: Headless matches between learning agents
+- [ ] **ELO rating system**: Track bot skill levels during training
+
+### Implementation Notes
+- Self-play: Bot plays against previous versions of itself
+- Competitive training: 2+ bots evolve together (arms race dynamics)
+- Need Phase 4 external bot runner for training isolation
+- Performance metrics essential for reward signal design
+- Consider starting with simple reward: survive + damage_dealt - damage_taken
+- Bots should learn to use mines and missiles effectively (needs Phase 5)
+
+---
+
+## Future: Phase 7+ - Advanced Features & Tournaments
+
+### Planned Features
+- Power-ups (speed, shield, health)
+- Genetic algorithms for bot evolution
+- Full tournament system with brackets
+- Bot marketplace/sharing
