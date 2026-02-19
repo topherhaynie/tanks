@@ -10,7 +10,6 @@ from tanks.config.constants import (
     FPS,
     INPUT_RATE,
     PHYSICS_RATE,
-    RADAR_SWEEP_SPEED,
     WINDOW_HEIGHT,
     WINDOW_TITLE,
     WINDOW_WIDTH,
@@ -291,7 +290,7 @@ class Game:
             entity_angle = angle_deg % 360
             current_sweep = tank.radar_sweep_angle % 360
             prev_sweep = tank.prev_radar_sweep_angle % 360
-            
+
             # Check if sweep JUST CROSSED the entity angle (from prev to current)
             # Handle wraparound at 0/360 degrees
             crossed = False
