@@ -227,9 +227,7 @@ def run_mixed_bot_battle_demo() -> bool:
 
     # Set up observer view with three fog colors
     game.renderer.set_perspective_tank(None)
-    active_tanks = [
-        tank for tank in [cpp_bot_tank, simple_bot_tank, smart_bot_tank] if tank
-    ]
+    active_tanks = [tank for tank in [cpp_bot_tank, simple_bot_tank, smart_bot_tank] if tank]
     game.renderer.set_observer_view(
         active_tanks,
         fog_opacity=0.5,

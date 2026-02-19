@@ -48,7 +48,7 @@ class ArenaConfig:
     terrain_pattern: TerrainPattern = TerrainPattern.SCATTERED
     bot_types: list[str] = field(default_factory=lambda: ["simple", "smart", "smart"])
     win_condition: WinCondition = field(
-        default_factory=lambda: WinCondition(WinConditionType.LAST_ALIVE)
+        default_factory=lambda: WinCondition(WinConditionType.LAST_ALIVE),
     )
     seed: int | None = None
 
