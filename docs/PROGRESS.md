@@ -659,28 +659,162 @@ All objectives met. Weapon system is balanced and integrated with:
 
 ---
 
-## Future: Phase 6 - Reinforcement Learning & Self-Play
+# Phase 6 Progress - Reinforcement Learning & Self-Play
 
-### Planned Features
-- [ ] **Self-play training**: Bots learn by competing against copies of themselves
-- [ ] **Competitive co-evolution**: Multiple agents training simultaneously (dueling architecture)
-- [ ] **Reward system**: Damage dealt, survival time, kills, match victory
-- [ ] **Training infrastructure**: Episode management, checkpoint saving, resume training
-- [ ] **Neural network integration**: PyTorch or TensorFlow policy networks
-- [ ] **Experience replay buffer**: Store and sample battle episodes for training
-- [ ] **Dueling DQN**: Separate value and advantage network streams
-- [ ] **Policy gradient methods**: PPO, A3C, or similar for continuous action spaces
-- [ ] **Training visualization**: Reward curves, win rates, learning progress dashboards
-- [ ] **Automated training arena**: Headless matches between learning agents
-- [ ] **ELO rating system**: Track bot skill levels during training
+**Status**: 🚧 IN PROGRESS
 
-### Implementation Notes
-- Self-play: Bot plays against previous versions of itself
-- Competitive training: 2+ bots evolve together (arms race dynamics)
-- Need Phase 4 external bot runner for training isolation
-- Performance metrics essential for reward signal design
-- Consider starting with simple reward: survive + damage_dealt - damage_taken
-- Bots should learn to use mines and missiles effectively (needs Phase 5)
+## Overview
+
+Phase 6 adds reinforcement learning capabilities to enable bots to learn optimal combat strategies through self-play and competitive co-evolution. Using PyTorch, we'll implement both DQN and PPO algorithms with comprehensive training infrastructure.
+
+**Design Document**: See [docs/Project Plans/07_Phase6_Reinforcement_Learning.md](docs/Project%20Plans/07_Phase6_Reinforcement_Learning.md) for full specification.
+
+## Sub-Phases
+
+### 6.1: Foundation (Training Environment) - ✅ COMPLETE
+- [x] Headless training environment (no rendering overhead)
+- [x] State representation (sensor data → 78-dim vector)
+- [x] Action space definition (12 discrete actions for DQN)
+- [x] Reward function (combat, survival, positioning)
+- [x] Episode management (reset, termination)
+
+**Implementation Files**:
+- `src/tanks/rl/state.py` - StateEncoder (78-dim vector from BotState)
+- `src/tanks/rl/actions.py` - DiscreteActionSpace (12 actions) + ContinuousActionSpace
+- `src/tanks/training/rewards.py` - RewardCalculator with configurable weights
+- `src/tanks/training/env.py` - TrainingEnvironment (gymnasium-style interface)
+- `src/tanks/training/episode.py` - Episode management and data collection
+- `src/tanks/training/test_phase6_1.py` - Validation tests (all passing)
+
+**Test Results**: Agent won training episode after 64 steps with reward +150.21
+
+### 6.1.5: RLBot Wrapper - ✅ COMPLETE
+- [x] RLBot: Bot wrapper for RL agents
+- [x] Agent interface for DQN/PPO compatibility
+- [x] Model save/load infrastructure
+- [x] Integration with BotController
+- [x] Demo mode support (placeholder)
+- [x] Full test coverage
+
+**Implementation Files**:
+- `src/tanks/bots/rl_bot.py` - RLBot wrapper class (implements Bot protocol)
+- `src/tanks/rl/models/agent.py` - Base Agent interface + RandomAgent baseline
+- `src/tanks/bots/test_rl_bot.py` - Integration tests (all passing)
+- Updated `src/tanks/bots/__init__.py` - Exports RLBot
+- Updated `src/tanks/rl/models/__init__.py` - Exports Agent base class
+
+**Architecture**: 
+- RLBot wraps trained agents to implement Bot protocol (`update(BotState) → BotAction`)
+- Agent interface defines prediction and checkpoint I/O
+- Enables trained RL agents to be used anywhere: tournaments, demos, arenas
+- Maintains training efficiency (no extra overhead)
+- Clean separation between training (fast numpy) and deployment (standard Bot)
+
+**Test Results**: RLBot wrapper passes all integration tests with RandomAgent baseline
+
+### 6.2: DQN Implementation
+- [ ] Deep Q-Network architecture (3-layer network)
+- [ ] Experience replay buffer (capacity: 100K)
+- [ ] DQN training loop with epsilon-greedy
+- [ ] Target network with periodic updates
+- [ ] Checkpoint saving/loading
+
+### 6.3: Self-Play & Training
+- [ ] Self-play framework (vs frozen checkpoints)
+- [ ] Visual training mode (watch bot learn)
+- [ ] TensorBoard integration (rewards, losses, metrics)
+- [ ] Checkpoint management system
+- [ ] Training resumption support
+
+### 6.4: PPO Implementation
+- [ ] Actor-critic network architecture
+- [ ] Generalized Advantage Estimation (GAE)
+- [ ] PPO clipped objective and training loop
+- [ ] Continuous action space (4 floats)
+- [ ] Parallel environment collection
+
+### 6.5: Advanced Features
+- [ ] ELO rating system
+- [ ] Competitive co-evolution (multiple bots training)
+- [ ] Curriculum learning (5-stage progression)
+- [ ] Comprehensive evaluation suite
+- [ ] Tournament integration with RL bots
+
+## Implementation Details
+
+### State Vector (78 dimensions)
+- **Self state** (7): position, angle, turret, hp, velocity
+- **Weapon state** (5): cooldowns, mine count, ammo
+- **Nearest enemy** (8): distance, bearing, hp, velocity
+- **Nearest bullet** (5): distance, bearing, velocity
+- **Nearest mine** (3): distance, bearing, armed status
+- **Radar summary** (10): sector counts, distances
+- **Fog summary** (8): revealed area, bounds
+- **Wall proximity** (8): 8-direction distances
+- **Recent combat** (4): damage dealt/taken, shots, hits
+- **Strategic** (10): positioning, kills, accuracy, map control
+- **Tactical flags** (10): under fire, low hp, stuck, etc.
+
+### Action Space (DQN - 12 discrete)
+0. NOOP
+1. MOVE_FORWARD
+2. MOVE_BACKWARD
+3. TURN_LEFT
+4. TURN_RIGHT
+5. MOVE_FORWARD + TURN_LEFT
+6. MOVE_FORWARD + TURN_RIGHT
+7. MOVE_BACKWARD + TURN_LEFT
+8. MOVE_BACKWARD + TURN_RIGHT
+9. SHOOT
+10. FIRE_MISSILE
+11. PLACE_MINE
+
+### Action Space (PPO - 4 continuous)
+- `move_speed`: [-1.0, 1.0] (backward to forward)
+- `turn_rate`: [-1.0, 1.0] (left to right)
+- `turret_angle_delta`: [-1.0, 1.0] (relative rotation)
+- `shoot_confidence`: [0.0, 1.0] (firing threshold)
+
+### Reward Function
+```python
+Combat Rewards:
+  +10.0   per bullet hit
+  +15.0   per missile hit
+  +20.0   per mine kill
+  +100.0  per kill
+  -100.0  per death
+  -5.0    per hit taken
+  -1.0    per bullet wasted
+
+Survival Rewards:
+  +0.1    per second alive
+  +50.0   for winning match
+
+Shaping (optional):
+  +1.0    for safe positioning
+  +2.0    for good cover
+  -0.5    for staying idle
+```
+
+## Success Criteria
+
+Phase 6 complete when:
+1. **DQN agent** beats SmartBot >50% of matches
+2. **PPO agent** beats DQN >70% of matches
+3. **Self-play** produces diverse strategies
+4. **TensorBoard** shows clear learning curves
+5. **RL bots** integrate seamlessly with tournament system
+
+## Known Issues
+None currently identified.
+
+## Implementation Notes
+- Start with DQN (simpler debugging)
+- Vector state initially (CNN later if needed)
+- Headless training for speed (10x real-time target)
+- Visual mode for debugging only
+- Self-play prevents catastrophic forgetting
+- Curriculum accelerates early learning
 
 ---
 

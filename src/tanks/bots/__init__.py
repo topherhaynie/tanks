@@ -4,6 +4,7 @@ from tanks.bots.bot_api import Bot, BotAction, BotState
 from tanks.bots.bot_controller import BotController
 from tanks.bots.external_controller import ExternalBotController
 from tanks.bots.external_runner import ExternalBotRunner
+from tanks.bots.rl_bot import RLBot
 from tanks.bots.simple_bot import SimpleBot
 from tanks.bots.smart_bot import SmartBot
 
@@ -14,6 +15,7 @@ __all__ = [
     "BotState",
     "ExternalBotController",
     "ExternalBotRunner",
+    "RLBot",
     "SimpleBot",
     "SmartBot",
 ]
