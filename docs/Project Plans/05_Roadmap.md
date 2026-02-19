@@ -15,20 +15,28 @@
 -   Terrain memory
 -   Radar detection
 
-## Phase 3 --- Bot Framework (Current)
+## Phase 3 --- Bot Framework (Complete)
 
 -   Bot controller base class (integrates with input system)
 -   Sensor API for bot inputs (vision, radar, fog memory)
--   Python bot API with examples and safe defaults
--   Simple bot implementation (wander/seek)
--   Tournament/observer mode scaffold
+-   Python bot API with dataclasses and Protocol
+-   Simple bot implementation (wander/seek with randomness)
+-   Smart bot implementation (radar pursuit, stuck detection)
 -   Observer visibility modes (global and perspective)
--   Bot performance metrics
--   Line-of-sight precision (target bounds, not just center)
+-   Observer rendering with dual fog overlays
+-   Demo modes (2-player, player-vs-bot, bot-vs-bot)
+-   External bot protocol documentation (JSON schema)
 
-## Phase 4 --- Game Modes and Levels
+## Phase 4 --- External Bots and Game Modes
 
--   Arena (multi-tank)
+-   **External Bot Runner**: subprocess management for C++/other languages
+-   **JSON IPC**: stdin/stdout communication (protocol already documented)
+-   **Bot timeout handling**: watchdog for slow/hanging bots
+-   **C++ bot SDK**: headers, example bot, CMake build
+-   Bot performance metrics (kills, deaths, accuracy, damage)
+-   Tournament mode framework (scheduling, ranking, leaderboards)
+-   Line-of-sight precision (center-to-edge visibility)
+-   Arena mode (multi-tank battles)
 -   Level mode with objectives
 -   Map loader and generator
 

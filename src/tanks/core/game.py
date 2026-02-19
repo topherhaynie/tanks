@@ -30,7 +30,7 @@ except ImportError:
     SoundManager = None  # type: ignore[misc, assignment]
 
 if TYPE_CHECKING:
-    from tanks.input.keyboard import KeyboardController
+    from tanks.input.controller import Controller
 
 
 class GameState:
@@ -77,7 +77,10 @@ class Game:
         self.radar_system = RadarSystem()
 
         # Input handlers
-        self.input_handlers: list[KeyboardController] = []
+        self.input_handlers: list[Controller] = []
+
+        # Input tick tracking
+        self.input_tick_id = 0
 
     def load_map(self, map_name: str | None = None) -> None:
         """Load a game map.
@@ -117,7 +120,7 @@ class Game:
             return tank
         return None
 
-    def add_input_handler(self, handler: "KeyboardController") -> None:
+    def add_input_handler(self, handler: "Controller") -> None:
         """Add an input handler for a tank.
 
         Args:
@@ -169,6 +172,7 @@ class Game:
             return
 
         # Process input handlers - sample at lower rate
+        self.input_tick_id += 1
         for handler in self.input_handlers:
             handler.update(dt)
 

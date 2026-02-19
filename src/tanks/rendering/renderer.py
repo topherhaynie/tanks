@@ -36,6 +36,10 @@ class Renderer:
         self.settings = settings
         self.font = None
         self.perspective_tank = None  # Tank from whose perspective to render fog
+        self.observer_tanks = None
+        self.observer_fog_opacity = 1.0
+        self.observer_fog_colors = None
+        self.observer_hidden_alpha = 1.0
 
         # Initialize font for debug text
         pygame.font.init()
@@ -76,6 +80,10 @@ class Renderer:
         context = RenderContext(
             game_state=game_state,
             perspective_tank=self.perspective_tank,
+            observer_tanks=self.observer_tanks,
+            observer_fog_opacity=self.observer_fog_opacity,
+            observer_fog_colors=self.observer_fog_colors,
+            observer_hidden_alpha=self.observer_hidden_alpha,
             settings=self.settings,
             current_time=time.time(),
         )
@@ -91,3 +99,24 @@ class Renderer:
 
         """
         self.perspective_tank = tank
+
+    def set_observer_view(
+        self,
+        tanks: list["Tank"] | None,
+        fog_opacity: float = 1.0,
+        fog_colors: tuple[tuple[int, int, int], tuple[int, int, int]] | None = None,
+        hidden_alpha: float = 1.0,
+    ) -> None:
+        """Set observer view parameters for multi-perspective rendering.
+
+        Args:
+            tanks: Tanks to use for observer fog layers, or None to disable.
+            fog_opacity: Opacity scale for fog overlays.
+            fog_colors: RGB colors to tint each fog layer.
+            hidden_alpha: Alpha for tanks hidden from opponents.
+
+        """
+        self.observer_tanks = tanks
+        self.observer_fog_opacity = fog_opacity
+        self.observer_fog_colors = fog_colors
+        self.observer_hidden_alpha = hidden_alpha

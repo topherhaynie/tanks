@@ -10,8 +10,8 @@ This document provides context and guidelines for AI coding assistants working o
 - Fog of war / limited vision for bots
 - Tournament/training modes for AI development
 
-**Current Phase:** Phase 2 (Perception System) - **COMPLETE**  
-**Next Phase:** Phase 3 (Bot Framework) - bot controllers, sensor API, tournament mode
+**Current Phase:** Phase 3 (Bot Framework) - **COMPLETE**  
+**Next Phase:** Phase 4 (External Bots & Game Modes) - C++ bot runner, tournament mode, metrics
 
 See [docs/PROGRESS.md](docs/PROGRESS.md) for detailed status.
 
@@ -142,16 +142,30 @@ max-complexity = 15  # Collision detection can be complex
 
 ### Phase 2 - Completed (Perception)
 - `src/tanks/perception/vision.py` - Vision raycasting and radar detection
+### Phase 2 - Completed (Perception)
+- `src/tanks/perception/vision.py` - Vision raycasting and radar detection
 - `src/tanks/perception/memory.py` - Terrain memory system  
 - `src/tanks/rendering/renderer.py` - Fog of war rendering with gradients
 - `src/tanks/core/game.py` - Perception update integration
 - `src/tanks/entities/tank.py` - Tank vision state and fog memory
 
-### Critical for Phase 3 (Bot Framework)
-- `src/tanks/bots/` - Bot controller implementations
-- `src/tanks/perception/` - Sensor API for bot inputs
-- `src/tanks/modes/` - Tournament mode framework
-- `src/tanks/input/controller.py` - Base controller interface
+### Phase 3 - Completed (Bot Framework)
+- `src/tanks/bots/bot_api.py` - Protocol and dataclasses
+- `src/tanks/bots/sensors.py` - Sensor snapshot builder
+- `src/tanks/bots/bot_controller.py` - Controller adapter for bots
+- `src/tanks/bots/simple_bot.py` - Wander/seek bot with randomness
+- `src/tanks/bots/smart_bot.py` - Radar pursuit bot with stuck detection
+- `src/tanks/rendering/fog.py` - Tinted fog for observer mode
+- `src/tanks/rendering/tanks.py` - Observer rendering with alpha
+- `src/tanks/demo.py` - Bot demo modes
+- `docs/Project Plans/06_Bot_API.md` - External bot protocol spec
+- `docs/bot_api.schema.json` - JSON schema
+
+### Critical for Phase 4 (External Bots & Game Modes)
+- `src/tanks/bots/external_runner.py` - Process management for external bots
+- `src/tanks/bots/cpp/` - C++ bot SDK and examples
+- `src/tanks/modes/` - Tournament and arena modes
+- `src/tanks/core/stats.py` - Performance metrics tracking
 
 ### Configuration
 - `src/tanks/config/constants.py` - Tunable parameters (speeds, sizes, rates)
@@ -209,24 +223,33 @@ Perception system is complete and performant. Key achievements:
 - Radar detection (600px radius, through-wall)
 - 60 FPS maintained with full fog effects
 
+### Phase 3 (Complete) ✅
+Bot framework is stable. Key achievements:
+- Python bot API with dataclasses (BotState, BotAction)
+- Sensor snapshot system (vision, radar, fog memory)
+- BotController integration with input system
+- SimpleBot and SmartBot implementations
+- Observer rendering with dual fog overlays
+- Bot-vs-bot demo with global view
+- External bot protocol documented (JSON schema)
+
 Implemented files:
-- `src/tanks/perception/vision.py` - Vision and radar systems
-- `src/tanks/perception/memory.py` - Terrain memory
-- `src/tanks/rendering/renderer.py` - Fog of war rendering
+- `src/tanks/bots/bot_api.py` - Protocol definitions
+- `src/tanks/bots/sensors.py` - State snapshot builder
+- `src/tanks/bots/bot_controller.py` - Controller adapter
+- `src/tanks/bots/simple_bot.py` - Basic bot
+- `src/tanks/bots/smart_bot.py` - Advanced bot
+- `src/tanks/rendering/fog.py` - Tinted fog rendering
+- `src/tanks/rendering/tanks.py` - Observer tank rendering
 
-### Phase 3 (Next - Bot Framework)
+### Phase 4 (Next - External Bots & Game Modes)
 Focus areas:
-- `src/tanks/bots/bot_controller.py` - AI controller base class
-- `src/tanks/perception/sensors.py` - Bot sensor API
-- `src/tanks/bots/simple_bot.py` - Example bot implementation
-- Tournament mode scaffolding
-
-### Phase 4 (Future - Advanced Bots)
-Focus areas:
-- Machine learning integration
-- Advanced bot behaviors
-- Training infrastructure
-- Performance metrics and analytics
+- `src/tanks/bots/external_runner.py` - Subprocess management for C++/other bots
+- `src/tanks/bots/cpp/` - C++ SDK with headers and examples
+- `src/tanks/modes/tournament.py` - Tournament framework
+- `src/tanks/core/stats.py` - Performance metrics (kills, deaths, accuracy)
+- External bot timeout handling and watchdog
+- Map loader and arena mode
 
 ## Debugging Tips
 

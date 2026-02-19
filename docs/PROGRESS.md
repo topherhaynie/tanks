@@ -184,20 +184,102 @@ All objectives met. Perception system is stable with:
 
 ---
 
-## Next Steps: Phase 3 - Bot Framework
+# Phase 3 Progress - Bot Framework
+
+**Status**: ✅ COMPLETE
+
+## Completed Features
+
+### Bot Infrastructure
+- [x] Bot controller base class (BotController integrates with input system)
+- [x] Sensor API (sensors.py builds comprehensive bot state snapshots)
+- [x] Python bot API with dataclasses (Protocol, BotState, BotAction, etc.)
+- [x] bot_api.py with full type annotations
+- [x] JSON schema for external bot protocol (bot_api.schema.json)
+- [x] Bot API documentation (06_Bot_API.md)
+
+### Bot Implementations
+- [x] SimpleBot with randomized wander/seek behavior
+- [x] SmartBot with radar pursuit and stuck detection
+- [x] Both bots use perception system (vision, radar, fog memory)
+
+### Observer Rendering
+- [x] Global perspective mode for watching bot matches
+- [x] Dual fog overlay system with RGB tinting
+- [x] Semi-transparent hidden tanks (70% alpha)
+- [x] Configurable fog opacity (50% default)
+- [x] Observer rendering pipeline with fog color customization
+
+### Demo Modes
+- [x] Two-player keyboard demo
+- [x] Player vs Bot demo (human vs SimpleBot)
+- [x] Bot vs Bot demo with global observer view
+- [x] Corner spawn positioning for bot battles
+- [x] Menu integration for all modes
+
+### Code Quality
+- [x] Full type annotations throughout bot system
+- [x] Google-style docstrings
+- [x] Passes Ruff linting
+- [x] Named constants for tunable parameters
+- [x] Organized into bots/ module
+
+## Phase 3 Implementation Details
+
+### Bot State Snapshot
+- Self state: position, rotation, HP, cooldown, team
+- Visible entities: tanks, bullets, obstacles with distance/bearing
+- Radar hits: through-wall detection with distance/bearing
+- Fog memory summary: run-length encoded revealed bounds
+- Map bounds and tile size
+
+### Bot Action Model
+- Boolean flags for movement (forward/backward, turn left/right)
+- Boolean flags for turret and shooting
+- Optional desired_turret_angle for smooth aiming override
+- 30Hz update rate matching input clock
+
+### Observer View Features
+- Renders all entities from god's-eye perspective
+- Shows both bots' individual fog of war simultaneously
+- Color-codes fog per bot (blue/red by default)
+- Adjustable opacity for fog overlays
+- Hidden tanks rendered with reduced alpha when not visible to enemy
+
+## Known Issues
+None currently identified.
+
+## Future Enhancements
+- [ ] **Line-of-sight precision**: Treat targets as circles (center-to-edge visibility)
+- [ ] **Bot performance metrics**: Track kills, deaths, accuracy, damage dealt/taken
+- [ ] **Tournament framework**: Match scheduling, ranking, leaderboards
+
+## Phase 3 Review
+All core objectives met. Bot framework is production-ready with:
+- Clean Python bot API with type safety
+- Comprehensive sensor snapshot system
+- Two working bot implementations
+- Observer mode for watching bot matches
+- Full integration with perception system
+- Documented external bot protocol (implementation deferred to Phase 4)
+
+---
+
+## Next Steps: Phase 4 - External Bots and Game Modes
 
 ### Upcoming Features
-- [ ] Bot controller base class (integrates with input system)
-- [ ] Sensor API for bot inputs (vision, radar, fog memory)
-- [ ] Python bot API with examples and safe defaults
-- [ ] Simple bot implementation (wander/seek behavior)
-- [ ] Tournament/observer mode framework
-- [ ] Observer visibility modes (global and perspective)
-- [ ] Bot performance metrics
-- [ ] Line-of-sight precision improvement (center-to-edge visibility)
+- [ ] **External Bot Runner**: Process management for non-Python bots
+- [ ] **JSON IPC**: stdin/stdout communication using documented protocol
+- [ ] **Bot timeout handling**: Watchdog for slow/hanging external bots
+- [ ] **C++ bot SDK**: Header files, example bot, build system
+- [ ] **Bot performance metrics**: Stats tracking and display
+- [ ] **Tournament mode**: Match framework, scheduling, results
+- [ ] **Additional game modes**: Arena (multi-tank), objectives
+- [ ] **Map system**: Loader, generator, variety of arenas
 
 ### Implementation Notes
-- Bots will use same controller interface as keyboard
-- Sensors will expose vision/radar data in bot-friendly format
-- Start simple (random movement) before complex AI
-- Use perception system output for bot decision-making
+- External bots use JSON stdin/stdout per 06_Bot_API.md spec
+- Start with subprocess.Popen for process management
+- 3-8ms timeout budget for external bots
+- C++ bots should match Python bot timing fairness
+- Consider performance metrics as foundation for tournament ranking

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tanks.local/schema/bot-api.json",
+  "title": "Tanks Bot API",
+  "description": "Schema for bot state requests and action responses.",
+  "oneOf": [
+    { "$ref": "#/$defs/StateRequest" },
+    { "$ref": "#/$defs/ActionResponse" }
+  ],
+  "$defs": {
+    "StateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "tick_id",
+        "dt",
+        "self",
+        "visible_entities",
+        "radar_hits",
+        "map_bounds",
+        "tile_size"
+      ],
+      "properties": {
+        "type": { "const": "state" },
+        "tick_id": { "type": "integer", "minimum": 0 },
+        "dt": { "type": "number", "exclusiveMinimum": 0 },
+        "self": { "$ref": "#/$defs/SelfState" },
+        "visible_entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/VisibleEntity" }
+        },
+        "radar_hits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RadarHit" }
+        },
+        "fog_memory": { "$ref": "#/$defs/FogMemorySummary" },
+        "map_bounds": { "$ref": "#/$defs/MapBounds" },
+        "tile_size": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ActionResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "tick_id",
+        "move_forward",
+        "move_backward",
+        "turn_left",
+        "turn_right",
+        "turret_left",
+        "turret_right",
+        "shoot"
+      ],
+      "properties": {
+        "type": { "const": "action" },
+        "tick_id": { "type": "integer", "minimum": 0 },
+        "move_forward": { "type": "boolean" },
+        "move_backward": { "type": "boolean" },
+        "turn_left": { "type": "boolean" },
+        "turn_right": { "type": "boolean" },
+        "turret_left": { "type": "boolean" },
+        "turret_right": { "type": "boolean" },
+        "shoot": { "type": "boolean" },
+        "desired_turret_angle": { "type": ["number", "null"] }
+      }
+    },
+    "SelfState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "x",
+        "y",
+        "rotation",
+        "turret_rotation",
+        "speed",
+        "hp",
+        "shoot_cooldown",
+        "team"
+      ],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rotation": { "type": "number" },
+        "turret_rotation": { "type": "number" },
+        "speed": { "type": "number" },
+        "hp": { "type": "integer", "minimum": 0 },
+        "shoot_cooldown": { "type": "number", "minimum": 0 },
+        "team": { "type": "integer" }
+      }
+    },
+    "VisibleEntity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "x",
+        "y",
+        "active",
+        "distance",
+        "bearing"
+      ],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "kind": {
+          "type": "string",
+          "enum": ["tank", "mine", "bullet", "obstacle"]
+        },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rotation": { "type": ["number", "null"] },
+        "turret_rotation": { "type": ["number", "null"] },
+        "team": { "type": ["integer", "null"] },
+        "active": { "type": "boolean" },
+        "distance": { "type": "number", "minimum": 0 },
+        "bearing": { "type": "number" }
+      }
+    },
+    "RadarHit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "distance", "bearing"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string", "enum": ["tank", "mine"] },
+        "distance": { "type": "number", "minimum": 0 },
+        "bearing": { "type": "number" }
+      }
+    },
+    "FogMemorySummary": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["revealed_bounds"],
+      "properties": {
+        "revealed_bounds": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "MapBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
