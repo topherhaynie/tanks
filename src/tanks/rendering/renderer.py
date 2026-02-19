@@ -818,31 +818,38 @@ class Renderer:
                 )
             else:
                 # Check radar blips for this tank with fade
-                for entity, timestamp, _angle, snap_x, snap_y, _entity_type in perspective_tank.radar_blips:
-                    if entity == other_tank:
-                        # Calculate fade based on time since detection
-                        age = current_time - timestamp
-                        if age < RADAR_BLIP_FADE_TIME:
-                            # Fade from 255 to 0 over RADAR_BLIP_FADE_TIME seconds
-                            fade_progress = age / RADAR_BLIP_FADE_TIME
-                            alpha = int(255 * (1.0 - fade_progress))
-
-                            # Draw fading red square at snapshot position
-                            square_size = 6
-                            blip_mini_x = int(snap_x * scale + offset_x)
-                            blip_mini_y = int(snap_y * scale + offset_y)
-                            temp_surface = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
-                            faded_color = (*COLOR_MINIMAP_TANK_ENEMY[:3], alpha)
-                            pygame.draw.rect(
-                                temp_surface,
-                                faded_color,
-                                (0, 0, square_size, square_size),
-                            )
-                            minimap.blit(
-                                temp_surface,
-                                (blip_mini_x - square_size // 2, blip_mini_y - square_size // 2),
-                            )
+                latest_blip = None
+                for blip_entity, timestamp, _angle, snap_x, snap_y, _entity_type in reversed(
+                    perspective_tank.radar_blips,
+                ):
+                    if blip_entity == other_tank:
+                        latest_blip = (timestamp, snap_x, snap_y)
                         break
+
+                if latest_blip:
+                    timestamp, snap_x, snap_y = latest_blip
+                    # Calculate fade based on time since detection
+                    age = current_time - timestamp
+                    if age < RADAR_BLIP_FADE_TIME:
+                        # Fade from 255 to 0 over RADAR_BLIP_FADE_TIME seconds
+                        fade_progress = age / RADAR_BLIP_FADE_TIME
+                        alpha = int(255 * (1.0 - fade_progress))
+
+                        # Draw fading red square at snapshot position
+                        square_size = 6
+                        blip_mini_x = int(snap_x * scale + offset_x)
+                        blip_mini_y = int(snap_y * scale + offset_y)
+                        temp_surface = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
+                        faded_color = (*COLOR_MINIMAP_TANK_ENEMY[:3], alpha)
+                        pygame.draw.rect(
+                            temp_surface,
+                            faded_color,
+                            (0, 0, square_size, square_size),
+                        )
+                        minimap.blit(
+                            temp_surface,
+                            (blip_mini_x - square_size // 2, blip_mini_y - square_size // 2),
+                        )
 
     def _draw_perspective_tank_on_minimap(
         self,
