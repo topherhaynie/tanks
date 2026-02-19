@@ -171,6 +171,7 @@ None currently identified.
   - Faded afterimage trail as beam rotates
   - Temporary blips at last known entity locations (fade over time)
   - More authentic radar sweep appearance
+- [ ] **Line of Sight Precision**: Treat targets as circles and allow visibility when any part of the target is visible (not just center-to-center).
 
 ## Phase 2 Review
 All objectives met. Perception system is stable with:
@@ -186,11 +187,14 @@ All objectives met. Perception system is stable with:
 ## Next Steps: Phase 3 - Bot Framework
 
 ### Upcoming Features
-- [ ] Bot controller base class
-- [ ] Sensor API for bot inputs
-- [ ] Simple bot implementation (random/wander behavior)
-- [ ] Tournament mode framework
+- [ ] Bot controller base class (integrates with input system)
+- [ ] Sensor API for bot inputs (vision, radar, fog memory)
+- [ ] Python bot API with examples and safe defaults
+- [ ] Simple bot implementation (wander/seek behavior)
+- [ ] Tournament/observer mode framework
+- [ ] Observer visibility modes (global and perspective)
 - [ ] Bot performance metrics
+- [ ] Line-of-sight precision improvement (center-to-edge visibility)
 
 ### Implementation Notes
 - Bots will use same controller interface as keyboard
