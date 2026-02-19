@@ -2,6 +2,8 @@
 
 import math
 
+import pygame
+
 
 class VisualEffect:
     """Base class for visual effects."""
@@ -42,6 +44,15 @@ class VisualEffect:
         if self.duration <= 0:
             return 1.0
         return 1.0 - (self.elapsed / self.duration)
+
+    def render(self, surface: pygame.Surface) -> None:
+        """Render the effect onto a surface.
+
+        Args:
+            surface: Surface to draw on.
+
+        """
+        return
 
 
 class MuzzleFlash(VisualEffect):
@@ -93,3 +104,20 @@ class MuzzleFlash(VisualEffect):
             points.append((px, py))
 
         return points
+
+    def render(self, surface: pygame.Surface) -> None:
+        """Render a muzzle flash effect.
+
+        Args:
+            surface: Surface to draw on.
+
+        """
+        points = self.get_flash_points()
+        min_points_for_polygon = 3
+        if len(points) >= min_points_for_polygon:
+            # Get alpha-adjusted color
+            alpha = self.get_alpha()
+            color = tuple(int(c * alpha) for c in self.color)
+
+            # Draw the star shape
+            pygame.draw.polygon(surface, color, points)
