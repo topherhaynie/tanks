@@ -3,4 +3,11 @@
 This module provides TensorBoard integration, ELO ratings, and evaluation tools.
 """
 
-__all__ = []
+from tanks.rl.metrics.tensorboard import TensorBoardLogger
+from tanks.rl.metrics.tracker import MetricsTracker, TrainingMetrics
+
+__all__ = [
+    "MetricsTracker",
+    "TensorBoardLogger",
+    "TrainingMetrics",
+]

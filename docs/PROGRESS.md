@@ -751,12 +751,88 @@ Phase 6 adds reinforcement learning capabilities to enable bots to learn optimal
 - ✓ TrainingEnvironment integration (10 steps in 0.03 reward)
 - ✓ Save/load checkpoint (deterministic outputs match)
 
-### 6.3: Self-Play & Training
-- [ ] Self-play framework (vs frozen checkpoints)
-- [ ] Visual training mode (watch bot learn)
-- [ ] TensorBoard integration (rewards, losses, metrics)
-- [ ] Checkpoint management system
-- [ ] Training resumption support
+### 6.3: Self-Play & Training - ✅ INFRASTRUCTURE COMPLETE
+- [x] Metrics tracking system (episode stats, combat metrics, learning curves)
+- [x] TensorBoard integration (real-time visualization, 15+ metric types)
+- [x] Checkpoint management (best/latest/periodic saves, opponent pool)
+- [x] Training script with CLI (start/stop/resume, evaluation mode)
+- [x] Comprehensive training guide (usage, troubleshooting, workflows)
+- [ ] Self-play framework (vs frozen checkpoints) - **Ready for implementation**
+- [ ] Visual training mode (watch bot learn) - **Future enhancement**
+
+**Implementation Files**:
+- `src/tanks/rl/metrics/tracker.py` - MetricsTracker and TrainingMetrics dataclass
+- `src/tanks/rl/metrics/tensorboard.py` - TensorBoardLogger with 15+ metric types
+- `src/tanks/rl/checkpoint.py` - CheckpointManager with best/latest/opponent pools
+- `src/tanks/scripts/train_dqn.py` - Complete CLI training script (500+ lines)
+- `docs/TRAINING_GUIDE.md` - Comprehensive user guide
+
+**Metrics System**:
+- **TrainingMetrics**: Episode reward, length, win/loss, kills, deaths, damage, accuracy, K/D, Q-values, action distribution, terrain revealed
+- **MetricsTracker**: Rolling averages (configurable window), statistics, CSV export, console summaries
+- **Action Distribution**: Histogram tracking to detect exploration issues
+
+**TensorBoard Integration**:
+```
+Logged Metrics (15+ types):
+  Episode: reward, length, win_rate
+  Training: loss, epsilon, q_value_mean, q_value_max
+  Combat: kills, deaths, damage_dealt, damage_taken
+  Accuracy: shooting_accuracy, kd_ratio
+  Survival: time_alive
+  Exploration: terrain_revealed, action_distribution (histogram)
+  Evaluation: eval_reward, eval_win_rate, eval_accuracy
+```
+
+**Checkpoint System**:
+```
+checkpoints/dqn/
+├── best_model.pt          # Best reward/win rate
+├── latest_model.pt        # Resume training
+├── training_metrics.csv   # Full history
+├── checkpoints/           # Periodic (max 10)
+└── opponents/             # Self-play pool (max 10)
+```
+
+**CLI Training Script**:
+```bash
+# Start training
+python -m tanks.scripts.train_dqn --episodes 1000 --tensorboard
+
+# Resume training  
+python -m tanks.scripts.train_dqn --resume
+
+# Evaluate
+python -m tanks.scripts.train_dqn --evaluate
+
+# View metrics
+tensorboard --logdir runs/
+```
+
+**Features**:
+- 30+ command-line arguments (episodes, hyperparameters, logging, checkpointing)
+- Graceful interrupt handling (Ctrl+C saves checkpoint)
+- Warmup period (random exploration before training)
+- Automatic best model tracking (reward + win rate)
+- Progress logging (configurable interval)
+- Device auto-detection (CPU/CUDA)
+- Network architecture selection (DQN/Dueling)
+
+**Training Guide** (`docs/TRAINING_GUIDE.md`):
+- Quick start examples
+- All CLI options documented
+- Checkpoint management explained
+- TensorBoard usage and metric interpretation
+- Troubleshooting guide (slow training, not learning, NaN loss, OOM)
+- Performance expectations (episode 0-200, 200-500, 500-1000, 1000+)
+- Advanced topics (curriculum learning, hyperparameter search)
+
+**Ready for Training**: All infrastructure in place. User can now:
+1. Start training with `python -m tanks.scripts.train_dqn --tensorboard`
+2. Monitor progress with TensorBoard
+3. Stop/resume training anytime (Ctrl+C)
+4. Evaluate trained agents
+5. Load agents into game via RLBot wrapper
 
 ### 6.4: PPO Implementation
 - [ ] Actor-critic network architecture
