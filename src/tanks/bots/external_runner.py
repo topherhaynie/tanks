@@ -155,7 +155,11 @@ class ExternalBotRunner:
             BotCrashError: If bot process died.
 
         """
-        if self.process is None or self.process.stdin is None or self.process.stdout is None:
+        if (
+            self.process is None
+            or self.process.stdin is None
+            or self.process.stdout is None
+        ):
             msg = "Bot process not properly initialized"
             raise BotCrashError(msg)
 

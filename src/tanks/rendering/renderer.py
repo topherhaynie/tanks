@@ -68,17 +68,19 @@ class Renderer:
             self.hud_renderer,
         )
 
-    def render_frame(self, game_state: Any) -> None:
+    def render_frame(self, game_state: Any, camera: Any) -> None:
         """Render a complete frame.
 
         Args:
             game_state: Current game state to render.
+            camera: Camera for viewport management.
 
         """
         self.frame_renderer.begin()
 
         context = RenderContext(
             game_state=game_state,
+            camera=camera,
             perspective_tank=self.perspective_tank,
             observer_tanks=self.observer_tanks,
             observer_fog_opacity=self.observer_fog_opacity,
@@ -86,6 +88,7 @@ class Renderer:
             observer_hidden_alpha=self.observer_hidden_alpha,
             settings=self.settings,
             current_time=time.time(),
+            stats_tracker=getattr(game_state, "stats_tracker", None),
         )
         self.pipeline.render(context)
 

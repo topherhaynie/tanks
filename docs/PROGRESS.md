@@ -310,6 +310,35 @@ All core objectives met. Bot framework is production-ready with:
 - [x] Integration with existing bot system
 - [x] Organized into bots/ module
 
+### Bot Performance Metrics (NEW)
+- [x] StatsTracker system for tracking all match statistics
+- [x] Per-tank stats: kills, deaths, accuracy, damage dealt/taken
+- [x] Survival time and distance traveled tracking
+- [x] Live stats overlay (F6 toggle)
+- [x] Post-match statistics summary
+- [x] Leaderboard sorting (by kills, accuracy, damage, K/D ratio)
+- [x] Team-level aggregated statistics
+- [x] Integration with all demo modes
+
+### Camera System (NEW)
+- [x] Enhanced Camera class with multiple modes
+- [x] GLOBAL mode: shows entire map with auto-zoom
+- [x] FOLLOW mode: smooth camera tracking of selected tank
+- [x] FREE mode: manual pan with arrow keys and zoom with +/-
+- [x] Viewport culling for efficient rendering
+- [x] Camera controls: C=cycle mode, Tab=switch target, +/-=zoom
+- [x] Integration with all renderers (map, tanks, bullets)
+- [x] Coordinate transforms (world to screen, screen to world)
+- [x] Map boundary clamping with smart centering
+- [x] Zoom scaling for all visual elements
+- [x] Arrow keys for panning in FREE mode
+- [x] Viewport culling for improved performance
+- [x] Smooth camera interpolation (follow mode)
+- [x] Map boundary clamping
+- [x] World-to-screen coordinate transforms with zoom
+- [x] Integration with all renderers (map, tanks, bullets)
+- [x] Demo-specific camera defaults (FOLLOW for player, GLOBAL for bot battles)
+
 ## Phase 4 Implementation Details
 
 ### External Bot Runner
@@ -333,63 +362,106 @@ All core objectives met. Bot framework is production-ready with:
 - Timeout and error handling verified
 - Ready for C++ bot integration when CMake available
 
+### Camera System
+- Enhanced Camera class with multiple modes
+- GLOBAL mode: shows entire map with auto-zoom
+- FOLLOW mode: smooth camera tracking of selected tank
+- FREE mode: manual pan with arrow keys and zoom with +/-
+- Viewport culling for efficient rendering on large maps
+- Camera controls: C=cycle mode, Tab=switch target, +/-=zoom
+- Integration with all renderers (map, tanks, bullets)
+- Coordinate transforms (world to screen, screen to world)
+- Map boundary clamping with smart centering
+- Zoom scaling for all visual elements
+
+### Observer Fog Rendering
+- Fixed fog colors for global observer mode
+- Transparent gray fog (30% opacity) for undiscovered areas
+- Colored fog overlays (40% opacity) for team-discovered areas
+- Additive color blending where multiple tanks explore
+- Proper fog gradients at edges
+- Three-layer rendering system for clarity
+
+### Procedural Map Generator
+- MapGenerator class with configurable parameters
+- Multiple map sizes: SMALL (20x11), MEDIUM (40x22), LARGE (60x34), HUGE (80x45)
+- Six terrain patterns:
+  - OPEN_ARENA: minimal obstacles for open combat
+  - SCATTERED: random obstacle distribution
+  - MAZE: recursive division algorithm with gaps
+  - ROOMS: connected rectangular rooms
+  - CORRIDORS: horizontal/vertical passage network
+  - FORTRESS: central keep with defensive walls
+- Obstacle density control (0-1 fraction)
+- Border wall generation
+- Symmetric map support for competitive fairness
+- Balanced spawn point generation (2-4+ spawns)
+- Map validation with flood-fill reachability checks
+- Configurable random seed for reproducibility
+- Cover cluster placement for tactical positioning
+
 ## In Progress Features
 - [x] Demo mode with external bot integration (3-way battle: C++, SimpleBot, SmartBot)
 - [x] Controller interface compliance (ExternalBotController matches base Controller)
+- [x] Bot performance metrics (kills, deaths, accuracy, damage, survival time, distance traveled)
+- [x] Camera system for larger maps (follow + global modes)
+- [x] Observer fog rendering improvements (proper color mixing)
+- [x] Procedural map generator (multiple sizes and patterns)
+- [x] Tournament mode framework (scheduling, ranking, leaderboards)
+- [x] Arena mode (4-8 tank multi-tank battles)
+
+### Tournament Mode Framework
+- [x] Win conditions: Last alive, time limit (most kills), elimination target
+- [x] Match management: Match data, results, points calculation
+- [x] Tournament formats: Round-robin, single elimination, ladder
+- [x] Leaderboard system: Rankings by points, K/D ratio, kill counts
+- [x] Match scheduling and progression
+- [x] Tournament statistics aggregation
+
+### Arena Mode
+- [x] Arena size configurations: Skirmish, Standard, Large, Chaos
+- [x] Multi-tank spawning (3-8 tanks simultaneously)
+- [x] Procedural map generation integration
+- [x] Bot controller assignment for each tank
+- [x] Observer view with distinct fog colors per tank
+- [x] Arena statistics and results tracking
+- [x] Demo mode with difficulty selection
 
 ## Remaining Phase 4 Features
-- [ ] Bot performance metrics (kills, deaths, accuracy)
-- [ ] Tournament mode framework
-- [ ] Arena mode (multi-tank battles)
-- [ ] Camera system for larger maps (follow + global)
-- [ ] Procedural map generator
-- [ ] Line-of-sight precision enhancement
+None - Phase 4 Complete! ✅
+
+## Phase 4 Completion Summary
+
+**All Phase 4 Features Implemented:**
+- ✅ External bot runner with JSON IPC and timeout handling
+- ✅ C++ bot SDK with example implementations
+- ✅ Bot performance metrics system (kills, deaths, accuracy, etc.)
+- ✅ Camera system with GLOBAL, FOLLOW, and FREE modes
+- ✅ Observer fog rendering with proper color mixing
+- ✅ Procedural map generator with 6 terrain patterns and 4 size presets
+- ✅ Tournament mode framework with win conditions and leaderboards
+- ✅ Arena mode (4-8 tank simultaneous battles)
+- ✅ Line-of-sight precision enhancement (center-to-edge visibility)
+
+**Vision System Enhancement: Center-to-Edge Raycasting**
+- Fast path: Check ray from tank center to entity center
+- Precision path: Test 8 rays to entity perimeter (N, NE, E, SE, S, SW, W, NW)
+- Accurate circular visibility with obstacle wrapping
+- Catches cases where entity center is blocked but edge is visible
+- Works for all entity types (tanks, bullets, mines)
+
+**5 Playable Game Modes:**
+1. Two-Player Demo (local multiplayer with fog of war)
+2. Player vs Bot (human vs AI with SmartBot)
+3. Bot vs Bot (observer view with metrics)
+4. Mixed Bot Battle (C++ + Python bots 3-way)
+5. Arena Battle (4-8 bots, 4 difficulty levels)
+
+---
 
 ## Known Issues
 None currently identified.
 
----
-
-## Next Steps: Phase 4 - External Bots and Game Modes (Continued)
-
-### Upcoming Features
-- [ ] **External Bot Runner**: Process management for non-Python bots
-- [ ] **JSON IPC**: stdin/stdout communication using documented protocol
-- [ ] **Bot timeout handling**: Watchdog for slow/hanging external bots
-- [ ] **C++ bot SDK**: Header files, example bot, build system
-- [ ] **Bot performance metrics**: Stats tracking and display
-- [ ] **Tournament mode**: Match framework, scheduling, results
-- [ ] **Additional game modes**: Arena (multi-tank), objectives
-- [ ] **Camera System**: Support for larger maps
-    - Follow camera for single-player view (smooth tracking)
-    - Global camera for observer view (entire map visible)
-    - Pan and zoom controls
-    - Screen-space bounds with smooth scrolling
-- [ ] **Advanced Map System**: 
-    - Procedural map generator with parameters
-    - Multiple map sizes (small, medium, large)
-    - Varied terrain patterns (arena, maze, corridors, rooms)
-    - JSON map loader for custom maps
-    - Map validation and balance checks
-    - Tournament-ready map prefabs library
-
-### Implementation Notes
-- External bots use JSON stdin/stdout per 06_Bot_API.md spec
-- Start with subprocess.Popen for process management
-- 3-8ms timeout budget for external bots
-- C++ bots should match Python bot timing fairness
-- Consider performance metrics as foundation for tournament ranking
-- **Camera**: Renderer already has camera offset capability - extend for follow mode
-- **Camera**: Follow camera centers on player tank with smooth lerp
-- **Camera**: Global camera scales to fit entire map (for training/observer)
-- **Camera**: Basic Camera class already exists in `rendering/camera.py` - needs smooth follow and bounds
-- **Map generator**: Use procedural algorithms (BSP, cellular automata, or Perlin noise)
-- **Map sizes**: Current 20x11 tiles (1280x704px), extend to 40x22 (2560x1408px), 80x44+ for large
-- **Map validation**: Ensure all spawn points are reachable, no isolated areas
-
----
-
-## Future: Phase 5 - Weapons & Items
 
 ### Planned Features
 - [ ] **Mines**: Deployable explosives detectable by radar

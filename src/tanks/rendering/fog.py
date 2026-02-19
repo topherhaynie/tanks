@@ -71,7 +71,10 @@ class FogRenderer:
         for x, y in context.iter_coords():
             if not context.is_revealed(x, y):
                 fog_rect = pygame.Rect(
-                    x * FOG_TILE_SIZE, y * FOG_TILE_SIZE, FOG_TILE_SIZE, FOG_TILE_SIZE
+                    x * FOG_TILE_SIZE,
+                    y * FOG_TILE_SIZE,
+                    FOG_TILE_SIZE,
+                    FOG_TILE_SIZE,
                 )
                 pygame.draw.rect(fog_surface, fog_color, fog_rect)
 
@@ -80,8 +83,204 @@ class FogRenderer:
 
         self._screen.blit(fog_surface, (0, 0))
 
+    def render_observer_fog(
+        self,
+        game_map: "Map",
+        tanks: list["Tank"],
+        fog_colors: tuple[tuple[int, int, int], ...],
+        undiscovered_opacity: float = 0.4,
+        team_tint_opacity: float = 0.35,
+    ) -> None:
+        """Render fog of war for observer mode with team coloring.
+
+        Behavior:
+        - Undiscovered areas (no tank has explored): Semi-transparent dark fog (reveals walls/background)
+        - Discovered areas (tanks have explored): Normal view + visible team color tint
+        - Multiple tanks discover same area: Tints layer naturally (soft color blending)
+        - Fully revealed: Normal view with no fog
+
+        Args:
+            game_map: The game map.
+            tanks: List of tanks with fog memories.
+            fog_colors: Tuple of RGB colors for each tank's fog.
+            undiscovered_opacity: Opacity for undiscovered areas (0-1), more transparent than normal.
+            team_tint_opacity: Opacity for team color tints on discovered areas (0-1).
+
+        """
+        map_width_px = game_map.width * TILE_SIZE
+        map_height_px = game_map.height * TILE_SIZE
+
+        if not tanks or not tanks[0].fog_memory:
+            return
+
+        context = FogContext(tanks[0].fog_memory)
+
+        # First pass: Semi-transparent dark fog for completely undiscovered areas
+        undiscovered_fog_color = (
+            COLOR_FOG[0],
+            COLOR_FOG[1],
+            COLOR_FOG[2],
+            int(255 * undiscovered_opacity),
+        )
+        undiscovered_surface = pygame.Surface(
+            (map_width_px, map_height_px),
+            pygame.SRCALPHA,
+        )
+
+        # Draw dark fog only where NO tank has revealed
+        for x, y in context.iter_coords():
+            any_revealed = any(
+                tank.fog_memory and tank.fog_memory.is_revealed(x, y)
+                for tank in tanks
+                if tank.fog_memory
+            )
+
+            if not any_revealed:
+                fog_rect = pygame.Rect(
+                    x * FOG_TILE_SIZE,
+                    y * FOG_TILE_SIZE,
+                    FOG_TILE_SIZE,
+                    FOG_TILE_SIZE,
+                )
+                pygame.draw.rect(undiscovered_surface, undiscovered_fog_color, fog_rect)
+
+        # Add gradients at edges of undiscovered fog
+        undiscovered_gradient = self._get_fog_gradient_stamp(undiscovered_fog_color)
+        self._add_fog_gradients_observer(
+            undiscovered_surface, tanks, undiscovered_gradient
+        )
+
+        # Blit undiscovered fog with normal alpha blending (reveals background through transparency)
+        self._screen.blit(undiscovered_surface, (0, 0))
+
+        # Second pass: Colored tints for each tank's discovered areas with gradients
+        for index, tank in enumerate(tanks):
+            if not tank.fog_memory:
+                continue
+
+            color = fog_colors[index % len(fog_colors)]
+
+            # Use the pure team color with moderate opacity for clear identification
+            team_tint_color = (
+                color[0],
+                color[1],
+                color[2],
+                int(255 * team_tint_opacity),
+            )
+
+            team_surface = pygame.Surface(
+                (map_width_px, map_height_px),
+                pygame.SRCALPHA,
+            )
+            tank_context = FogContext(tank.fog_memory)
+
+            # Draw color tint only for this tank's DISCOVERED areas
+            for x, y in tank_context.iter_coords():
+                if tank_context.is_revealed(x, y):
+                    fog_rect = pygame.Rect(
+                        x * FOG_TILE_SIZE,
+                        y * FOG_TILE_SIZE,
+                        FOG_TILE_SIZE,
+                        FOG_TILE_SIZE,
+                    )
+                    pygame.draw.rect(team_surface, team_tint_color, fog_rect)
+
+            # Add gradients to smooth out blocky edges of team coloring
+            team_gradient = self._get_fog_gradient_stamp(team_tint_color)
+            self._add_team_fog_gradients(team_surface, tank, team_gradient)
+
+            # Blit with normal alpha blending so tints layer naturally
+            self._screen.blit(team_surface, (0, 0))
+
+    def _add_fog_gradients_observer(
+        self,
+        fog_surface: pygame.Surface,
+        tanks: list["Tank"],
+        gradient_stamp: pygame.Surface,
+    ) -> None:
+        """Add gradients at fog edges for observer base fog.
+
+        Args:
+            fog_surface: Surface to draw gradients on.
+            tanks: List of tanks to check for revealed areas.
+            gradient_stamp: Pre-rendered gradient stamp to blit.
+
+        """
+        if not tanks or not tanks[0].fog_memory:
+            return
+
+        context = FogContext(tanks[0].fog_memory)
+        stamp_radius = gradient_stamp.get_width() // 2
+
+        for x, y in context.iter_coords():
+            # Check if any tank has revealed this tile
+            any_revealed = any(
+                tank.fog_memory and tank.fog_memory.is_revealed(x, y)
+                for tank in tanks
+                if tank.fog_memory
+            )
+
+            # Check if any neighbor is unrevealed by all tanks
+            has_unrevealed_neighbor = False
+            for dy in [-1, 0, 1]:
+                for dx in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    neighbor_revealed = any(
+                        tank.fog_memory and tank.fog_memory.is_revealed(x + dx, y + dy)
+                        for tank in tanks
+                        if tank.fog_memory
+                    )
+                    if not neighbor_revealed:
+                        has_unrevealed_neighbor = True
+                        break
+                if has_unrevealed_neighbor:
+                    break
+
+            if any_revealed and has_unrevealed_neighbor:
+                center_x = int((x + 0.5) * FOG_TILE_SIZE)
+                center_y = int((y + 0.5) * FOG_TILE_SIZE)
+
+                fog_surface.blit(
+                    gradient_stamp,
+                    (center_x - stamp_radius, center_y - stamp_radius),
+                    special_flags=pygame.BLEND_RGBA_MAX,
+                )
+
+    def _add_team_fog_gradients(
+        self,
+        fog_surface: pygame.Surface,
+        tank: "Tank",
+        gradient_stamp: pygame.Surface,
+    ) -> None:
+        """Add gradients at edges of team fog to smooth blocky appearance.
+
+        Args:
+            fog_surface: Surface to draw gradients on.
+            tank: Tank whose fog memory to check.
+            gradient_stamp: Pre-rendered gradient stamp to blit.
+
+        """
+        if not tank.fog_memory:
+            return
+
+        context = FogContext(tank.fog_memory)
+        stamp_radius = gradient_stamp.get_width() // 2
+
+        for x, y in context.iter_coords():
+            if context.is_revealed(x, y) and context.has_unrevealed_neighbor(x, y):
+                center_x = int((x + 0.5) * FOG_TILE_SIZE)
+                center_y = int((y + 0.5) * FOG_TILE_SIZE)
+
+                fog_surface.blit(
+                    gradient_stamp,
+                    (center_x - stamp_radius, center_y - stamp_radius),
+                    special_flags=pygame.BLEND_RGBA_MAX,
+                )
+
     def _get_fog_gradient_stamp(
-        self, fog_color: tuple[int, int, int, int]
+        self,
+        fog_color: tuple[int, int, int, int],
     ) -> pygame.Surface:
         """Get a cached fog gradient stamp for a given color.
 

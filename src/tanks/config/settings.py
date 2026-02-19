@@ -20,6 +20,7 @@ class Settings:
         self.show_minimap = True  # Show minimap with radar overlay
         self.show_fps = True
         self.show_entity_info = False
+        self.show_stats = False  # Show live performance stats overlay
 
         # Game
         self.paused = False

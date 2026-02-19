@@ -1,4 +1,23 @@
 {
   "ruff.enable": true,
-  "ruff.configurationPreference": "filesystemFirst"
+  "ruff.configurationPreference": "filesystemFirst",
+  "chat.tools.terminal.autoApprove": {
+    "ruff": true,
+    "/^source \\.venv/bin/activate && ruff check \\.$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^source \\.venv/bin/activate && ruff check src/tanks/demo\\.py$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^source \\.venv/bin/activate && ruff check \\. && ruff format \\.$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^source \\.venv/bin/activate && ruff check src/tanks/maps/generator\\.py$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
 }

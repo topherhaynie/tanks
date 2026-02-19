@@ -1,7 +1,7 @@
 """Tank rendering helpers."""
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pygame
 
@@ -23,36 +23,55 @@ class TankRenderer:
         """
         self._screen = screen
 
-    def render_all(self, tanks: list["Tank"]) -> None:
+    def render_all(self, tanks: list["Tank"], camera: Any = None) -> None:
         """Render all tanks.
 
         Args:
             tanks: List of tank entities to render.
+            camera: Optional camera for viewport transforms.
 
         """
         for tank in tanks:
             if not tank.active:
                 continue
 
-            self._draw_tank(tank, alpha=255)
+            # Skip if not visible
+            if camera and not camera.is_visible(tank.x, tank.y, margin=100):
+                continue
 
-    def render_visible(self, tanks: list["Tank"], perspective_tank: "Tank") -> None:
+            self._draw_tank(tank, alpha=255, camera=camera)
+
+    def render_visible(
+        self,
+        tanks: list["Tank"],
+        perspective_tank: "Tank",
+        camera: Any = None,
+    ) -> None:
         """Render tanks visible to the perspective tank.
 
         Args:
             tanks: List of tank entities to render.
             perspective_tank: Tank whose perspective determines visibility.
+            camera: Optional camera for viewport transforms.
 
         """
         for tank in tanks:
             if not tank.active:
                 continue
 
+            # Skip if not visible in viewport
+            if camera and not camera.is_visible(tank.x, tank.y, margin=100):
+                continue
+
             if tank == perspective_tank or tank in perspective_tank.visible_entities:
-                self._draw_tank(tank, alpha=255)
+                self._draw_tank(tank, alpha=255, camera=camera)
 
     def render_observer(
-        self, tanks: list["Tank"], observer_tanks: list["Tank"], hidden_alpha: float
+        self,
+        tanks: list["Tank"],
+        observer_tanks: list["Tank"],
+        hidden_alpha: float,
+        camera: Any = None,
     ) -> None:
         """Render tanks for a global observer view with visibility cues.
 
@@ -60,6 +79,7 @@ class TankRenderer:
             tanks: List of tank entities to render.
             observer_tanks: Tanks whose vision determines visibility.
             hidden_alpha: Alpha to use for tanks hidden from opponents.
+            camera: Optional camera for viewport transforms.
 
         """
         hidden_alpha_value = max(0, min(255, int(255 * hidden_alpha)))
@@ -68,65 +88,95 @@ class TankRenderer:
             if not tank.active:
                 continue
 
+            # Skip if not visible in viewport
+            if camera and not camera.is_visible(tank.x, tank.y, margin=100):
+                continue
+
             visible_to_enemy = self._is_visible_to_enemy(tank, observer_tanks)
             alpha = 255 if visible_to_enemy else hidden_alpha_value
-            self._draw_tank(tank, alpha=alpha)
+            self._draw_tank(tank, alpha=alpha, camera=camera)
 
-    def _draw_tank(self, tank: "Tank", alpha: int) -> None:
+    def _draw_tank(self, tank: "Tank", alpha: int, camera: Any = None) -> None:
         """Draw a tank body, turret, and HP bar.
 
         Args:
             tank: Tank entity to draw.
             alpha: Transparency level (0-255).
+            camera: Optional camera for viewport transforms.
 
         """
         color = COLOR_TANK_FRIENDLY if tank.team == 0 else COLOR_TANK_ENEMY
-        surface_size = int(tank.radius * 2 + 24)
+
+        # Apply zoom to tank size
+        zoom = camera.zoom if camera else 1.0
+        scaled_radius = tank.radius * zoom
+
+        surface_size = int(scaled_radius * 2 + 24 * zoom)
         surface = pygame.Surface((surface_size, surface_size), pygame.SRCALPHA)
         center = surface_size // 2
 
         body_color = (*color, alpha)
-        pygame.draw.circle(surface, body_color, (center, center), tank.radius)
+        pygame.draw.circle(surface, body_color, (center, center), int(scaled_radius))
 
         angle_rad = math.radians(tank.angle)
-        end_x = center + math.cos(angle_rad) * tank.radius
-        end_y = center + math.sin(angle_rad) * tank.radius
+        end_x = center + math.cos(angle_rad) * scaled_radius
+        end_y = center + math.sin(angle_rad) * scaled_radius
         pygame.draw.line(
-            surface, (255, 255, 255, alpha), (center, center), (end_x, end_y), 2
+            surface,
+            (255, 255, 255, alpha),
+            (center, center),
+            (end_x, end_y),
+            max(1, int(2 * zoom)),
         )
 
         turret_angle_rad = math.radians(tank.turret_angle)
-        turret_end_x = center + math.cos(turret_angle_rad) * (tank.radius + 8)
-        turret_end_y = center + math.sin(turret_angle_rad) * (tank.radius + 8)
+        turret_end_x = center + math.cos(turret_angle_rad) * (scaled_radius + 8 * zoom)
+        turret_end_y = center + math.sin(turret_angle_rad) * (scaled_radius + 8 * zoom)
         pygame.draw.line(
             surface,
             (200, 200, 200, alpha),
             (center, center),
             (turret_end_x, turret_end_y),
-            4,
+            max(1, int(4 * zoom)),
         )
 
-        self._draw_hp_bar(surface, tank, alpha)
+        self._draw_hp_bar(surface, tank, alpha, zoom)
 
-        self._screen.blit(surface, (tank.x - center, tank.y - center))
+        # Convert world position to screen position
+        if camera:
+            screen_x, screen_y = camera.world_to_screen(tank.x, tank.y)
+        else:
+            screen_x, screen_y = tank.x, tank.y
 
-    def _draw_hp_bar(self, surface: pygame.Surface, tank: "Tank", alpha: int) -> None:
+        self._screen.blit(surface, (screen_x - center, screen_y - center))
+
+    def _draw_hp_bar(
+        self,
+        surface: pygame.Surface,
+        tank: "Tank",
+        alpha: int,
+        zoom: float = 1.0,
+    ) -> None:
         """Render health bar above tank.
 
         Args:
             surface: Surface to draw the HP bar on.
             tank: Tank entity to render HP bar for.
             alpha: Transparency level (0-255).
+            zoom: Camera zoom level for scaling.
 
         """
-        bar_width = tank.radius * 2
-        bar_height = 4
+        scaled_radius = tank.radius * zoom
+        bar_width = scaled_radius * 2
+        bar_height = 4 * zoom
         center = surface.get_width() // 2
         bar_x = center - bar_width / 2
-        bar_y = center - tank.radius - 10
+        bar_y = center - scaled_radius - 10 * zoom
 
         pygame.draw.rect(
-            surface, (200, 50, 50, alpha), (bar_x, bar_y, bar_width, bar_height)
+            surface,
+            (200, 50, 50, alpha),
+            (bar_x, bar_y, bar_width, bar_height),
         )
 
         hp_ratio = tank.hp / tank.max_hp

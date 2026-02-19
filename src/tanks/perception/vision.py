@@ -19,7 +19,16 @@ if TYPE_CHECKING:
 
 
 class VisionSystem:
-    """Handles line-of-sight vision with raycasting."""
+    """Handles line-of-sight vision with precise center-to-edge raycasting.
+
+    Features:
+    - DDA raycasting for checking walls/obstacles
+    - Center-to-center ray + 8 perimeter rays for entity visibility
+    - Accurate circular vision wrap-around at obstacle edges
+    - Fog of war integration with terrain memory
+    - Radar detection system (through-wall)
+
+    """
 
     def __init__(self, game_map: "Map") -> None:
         """Initialize vision system.
@@ -38,7 +47,10 @@ class VisionSystem:
         Entities are visible if:
         - Within VISION_RADIUS (150px) - active fog revelation range, OR
         - Within ENTITY_VISION_RADIUS (600px) AND path is clear of fog (all fog tiles revealed)
-        - AND line of sight is clear (no walls)
+        - AND center-to-edge line of sight is clear (no walls block view to entity edge)
+
+        Uses center-to-edge raycasting for precise circular visibility: checks if
+        any ray from tank center to entity edge is unobstructed.
 
         Fog acts as a vision blocker for extended range. Entities can hide in/behind fog.
 
@@ -73,8 +85,8 @@ class VisionSystem:
             if not within_extended_vision:
                 continue
 
-            # Check line of sight (walls)
-            if not self.has_line_of_sight(tank.x, tank.y, entity.x, entity.y):
+            # Check line of sight using center-to-edge raycasting for precision
+            if not self._has_line_of_sight_to_entity(tank, entity):
                 continue
 
             # Within active vision radius - always visible if line of sight is clear
@@ -138,6 +150,80 @@ class VisionSystem:
                 return False
 
         return True
+
+    def _has_line_of_sight_to_entity(self, tank: "Tank", entity: "Entity") -> bool:
+        """Check line of sight to an entity using center-to-edge raycasting.
+
+        Instead of just checking one ray to entity center, checks rays to the
+        entity's edge (perimeter). If ANY ray reaches the entity, it's visible.
+        This creates more accurate circular visibility with proper edge detection.
+
+        Args:
+            tank: Observer tank.
+            entity: Entity to check visibility of.
+
+        Returns:
+            True if any ray from tank center to entity edge has line of sight.
+
+        """
+        # First check center-to-center ray (fast path)
+        if self.has_line_of_sight(tank.x, tank.y, entity.x, entity.y):
+            return True
+
+        # Entity has some radius (all entities are circular in collision)
+        # Check rays to entity perimeter at cardinal and diagonal points
+        # This catches cases where center is blocked but edge is visible
+        entity_radius = self._get_entity_radius(entity)
+        if entity_radius <= 0:
+            return False
+
+        # Check 8 rays: North, NE, East, SE, South, SW, West, NW
+        # These cover the entity's perimeter
+        angles = [
+            0,  # East
+            math.pi / 4,  # NE
+            math.pi / 2,  # North
+            3 * math.pi / 4,  # NW
+            math.pi,  # West
+            5 * math.pi / 4,  # SW
+            3 * math.pi / 2,  # South
+            7 * math.pi / 4,  # SE
+        ]
+
+        for angle in angles:
+            # Calculate point on entity perimeter
+            edge_x = entity.x + entity_radius * math.cos(angle)
+            edge_y = entity.y + entity_radius * math.sin(angle)
+
+            # Check if this point is visible
+            if self.has_line_of_sight(tank.x, tank.y, edge_x, edge_y):
+                return True
+
+        return False
+
+    def _get_entity_radius(self, entity: "Entity") -> float:
+        """Get the collision radius of an entity.
+
+        Args:
+            entity: Entity to measure.
+
+        Returns:
+            Collision radius in pixels.
+
+        """
+        # Import here to avoid circular imports
+        from tanks.entities.bullet import Bullet
+        from tanks.entities.tank import Tank as TankEntity
+        from tanks.entities.mine import Mine
+
+        if isinstance(entity, TankEntity):
+            return 16.0  # Tank radius
+        elif isinstance(entity, Bullet):
+            return 3.0  # Bullet radius
+        elif isinstance(entity, Mine):
+            return 12.0  # Mine radius
+
+        return 8.0  # Default fallback
 
     def _has_fog_blocking(
         self, x1: float, y1: float, x2: float, y2: float, fog_memory: Any

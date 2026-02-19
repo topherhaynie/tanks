@@ -15,6 +15,7 @@ from tanks.config.constants import TILE_SIZE
 from tanks.core import Game
 from tanks.input import KeyboardController
 from tanks.input.keyboard import KeyboardController2
+from tanks.rendering.camera import CameraMode
 
 if TYPE_CHECKING:
     from tanks.entities.tank import Tank
@@ -56,8 +57,16 @@ def run_demo() -> bool:
     print("Tank Battle - Two Player Demo")  # noqa: T201
     print("Player 1: WASD to move, Mouse to aim, Space to shoot")  # noqa: T201
     print("Player 2: Arrow keys to move, JL to aim turret, RCtrl to shoot")  # noqa: T201
-    print("F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, P=pause")  # noqa: T201
+    print(
+        "F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, F6=stats, P=pause",
+    )
+    print("C=cycle camera, Tab=switch follow target, +/-=zoom")  # noqa: T201
     print()  # noqa: T201
+
+    # Set camera to follow player 1
+    game.camera.set_mode(CameraMode.FOLLOW)
+    if player1_tank:
+        game.camera.set_follow_target(player1_tank)
 
     game.run()
 
@@ -93,8 +102,16 @@ def run_bot_demo() -> bool:
     print("Tank Battle - Player vs Bot")  # noqa: T201
     print("Player: WASD to move, Mouse to aim, Space to shoot")  # noqa: T201
     print("Bot: Simple seek/wander behavior")  # noqa: T201
-    print("F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, P=pause")  # noqa: T201
+    print(
+        "F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, F6=stats, P=pause",
+    )
+    print("C=cycle camera, Tab=switch follow target, +/-=zoom")  # noqa: T201
     print()  # noqa: T201
+
+    # Set camera to follow player
+    game.camera.set_mode(CameraMode.FOLLOW)
+    if player_tank:
+        game.camera.set_follow_target(player_tank)
 
     game.run()
 
@@ -134,10 +151,19 @@ def run_bot_battle_demo() -> bool:
     print("Tank Battle - Bot vs Bot (Global View)")  # noqa: T201
     print("Bot 1: Simple seek/wander")  # noqa: T201
     print("Bot 2: Smart seek/radar pursuit")  # noqa: T201
-    print("F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, P=pause")  # noqa: T201
+    print(
+        "F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, F6=stats, P=pause",
+    )
+    print("C=cycle camera, Tab=switch follow target, +/-=zoom")  # noqa: T201
     print()  # noqa: T201
 
+    # Set camera to global view (shows entire map)
+    game.camera.set_mode(CameraMode.GLOBAL)
+
     game.run()
+
+    # Show final statistics
+    game.display_final_stats()
 
     return game.state.quit_app
 
@@ -159,8 +185,8 @@ def run_mixed_bot_battle_demo() -> bool:
         print("❌ C++ bot not found!")  # noqa: T201
         print(f"Expected at: {cpp_bot_path}")  # noqa: T201
         print(
-            "Build it with: cd src/tanks/bots/cpp && mkdir -p build && cd build && cmake .. && make"
-        )  # noqa: T201
+            "Build it with: cd src/tanks/bots/cpp && mkdir -p build && cd build && cmake .. && make",
+        )
         print("\nPress Enter to return to menu...")  # noqa: T201
         input()
         return False
@@ -215,8 +241,14 @@ def run_mixed_bot_battle_demo() -> bool:
     print("Bot 1 (Blue):  C++ External Bot (seek/wander)")  # noqa: T201
     print("Bot 2 (Red):   Python SimpleBot (seek/wander)")  # noqa: T201
     print("Bot 3 (Green): Python SmartBot (radar pursuit)")  # noqa: T201
-    print("F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, P=pause")  # noqa: T201
+    print(
+        "F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, F6=stats, P=pause",
+    )
+    print("C=cycle camera, Tab=switch follow target, +/-=zoom")  # noqa: T201
     print()  # noqa: T201
+
+    # Set camera to global view (shows entire map)
+    game.camera.set_mode(CameraMode.GLOBAL)
 
     game.run()
 
@@ -227,6 +259,86 @@ def run_mixed_bot_battle_demo() -> bool:
             print("✓ C++ bot stopped")  # noqa: T201
         except Exception as e:
             print(f"Warning: Error stopping C++ bot: {e}", file=sys.stderr)
+
+    # Show final statistics
+    game.display_final_stats()
+
+    return game.state.quit_app
+
+
+def run_arena_demo() -> bool:
+    """Run an arena battle with 4+ bots on a procedurally generated map.
+
+    Demonstrates multi-tank battles with configurable difficulty levels.
+    Uses global observer view to watch all bots compete.
+
+    Returns:
+        True if user wants to quit the application, False to return to menu.
+
+    """
+    from tanks.modes import ArenaSize
+    from tanks.modes.arena_setup import ArenaSetup
+
+    print("\n=== ARENA BATTLE ===")  # noqa: T201
+    print("1. Skirmish (3-4 tanks, small map)")  # noqa: T201
+    print("2. Standard (4 tanks, medium map)")  # noqa: T201
+    print("3. Large (6 tanks, large map)")  # noqa: T201
+    print("4. Chaos (8 tanks, huge map)")  # noqa: T201
+    print("q. Cancel")  # noqa: T201
+
+    choice = input("Select arena size: ").strip().lower()
+
+    arena_sizes = {
+        "1": ArenaSize.SKIRMISH,
+        "2": ArenaSize.STANDARD,
+        "3": ArenaSize.LARGE,
+        "4": ArenaSize.CHAOS,
+    }
+
+    if choice not in arena_sizes:
+        return False
+
+    game = Game()
+
+    # Set up arena with selected size
+    ArenaSetup.setup_arena_from_size(game, arena_sizes[choice])
+
+    # Set up observer view with distinct fog colors
+    observer_tanks = game.state.tanks
+    fog_colors = (
+        (70, 110, 255),  # Blue
+        (255, 90, 90),  # Red
+        (90, 255, 90),  # Green
+        (255, 200, 50),  # Orange
+        (200, 90, 255),  # Purple
+        (90, 255, 255),  # Cyan
+        (255, 150, 150),  # Pink
+        (150, 200, 100),  # Olive
+    )
+    game.renderer.set_perspective_tank(None)
+    game.renderer.set_observer_view(
+        observer_tanks,
+        fog_opacity=0.5,
+        fog_colors=fog_colors[: len(observer_tanks)],
+        hidden_alpha=0.7,
+    )
+
+    print(f"\nArena Battle - {arena_sizes[choice].label}")  # noqa: T201
+    for i, tank in enumerate(observer_tanks):
+        print(f"Tank {i + 1}: {tank.team} (bot)")  # noqa: T201
+    print(
+        "F1=debug all, F2=hitboxes, F3=vision ranges, F4=radar blips, F6=stats, P=pause",
+    )
+    print("C=cycle camera, Tab=switch follow target, +/-=zoom")  # noqa: T201
+    print()  # noqa: T201
+
+    # Set camera to global view (shows entire map)
+    game.camera.set_mode(CameraMode.GLOBAL)
+
+    game.run()
+
+    # Show final statistics
+    game.display_final_stats()
 
     return game.state.quit_app
 

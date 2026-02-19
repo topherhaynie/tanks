@@ -17,12 +17,14 @@ from tanks.config.constants import (
 from tanks.config.settings import Settings
 from tanks.core.clock import FixedClock
 from tanks.core.events import EventSystem
+from tanks.core.stats import StatsTracker
 from tanks.effects.visual import MuzzleFlash, VisualEffect
 from tanks.entities import Bullet, Tank
 from tanks.maps import MapLoader
 from tanks.perception import RadarSystem, TerrainMemory, VisionSystem
 from tanks.physics import CollisionSystem, MovementSystem, ProjectileSystem
 from tanks.rendering import Renderer
+from tanks.rendering.camera import Camera, CameraMode
 
 try:
     from tanks.audio import SoundManager
@@ -45,6 +47,7 @@ class GameState:
         self.fps: float = 0
         self.running: bool = True
         self.quit_app: bool = False  # Signal to quit entire application
+        self.stats_tracker = None  # Will be set by Game instance
 
 
 class Game:
@@ -69,12 +72,17 @@ class Game:
 
         # Systems
         self.renderer = Renderer(self.screen, self.settings)
+        self.camera = Camera(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.collision_system = None  # Created after map loads
         self.movement_system = MovementSystem()
         self.projectile_system = ProjectileSystem()
         self.sound_manager = SoundManager() if SoundManager else None
         self.vision_system = None  # Created after map loads
         self.radar_system = RadarSystem()
+        self.stats_tracker = StatsTracker()
+
+        # Link stats tracker to state for rendering access
+        self.state.stats_tracker = self.stats_tracker
 
         # Input handlers
         self.input_handlers: list[Controller] = []
@@ -102,6 +110,9 @@ class Game:
         self.collision_system = CollisionSystem(self.state.game_map)
         self.vision_system = VisionSystem(self.state.game_map)
 
+        # Set camera bounds
+        self.camera.set_map_bounds(self.state.game_map)
+
     def spawn_tank(self, spawn_index: int = 0) -> Tank | None:
         """Spawn a tank at a spawn point.
 
@@ -118,9 +129,12 @@ class Game:
             tank = Tank(x, y, team)
             # Initialize fog memory for the tank
             tank.fog_memory = TerrainMemory(
-                self.state.game_map.width, self.state.game_map.height
+                self.state.game_map.width,
+                self.state.game_map.height,
             )
             self.state.tanks.append(tank)
+            # Register tank for stats tracking
+            self.stats_tracker.register_tank(tank)
             return tank
         return None
 
@@ -160,7 +174,13 @@ class Game:
 
             # Render
             self.state.fps = self.clock.get_fps()  # Show physics rate
-            self.renderer.render_frame(self.state)
+
+            # Handle camera panning (continuous input)
+            self._handle_camera_pan(physics_dt)
+
+            # Update camera position
+            self.camera.update(physics_dt)
+            self.renderer.render_frame(self.state, self.camera)
 
             # Limit rendering FPS
             self.render_clock.tick(FPS)
@@ -193,6 +213,10 @@ class Game:
         # Update tanks
         for tank in self.state.tanks:
             tank.update(dt)
+            # Track survival time and distance
+            if tank.active:
+                self.stats_tracker.update_survival_time(tank, dt)
+                self.stats_tracker.update_distance(tank)
 
         # Update bullets
         for bullet in self.state.bullets[:]:
@@ -201,7 +225,9 @@ class Game:
             # Check wall collisions
             hit_wall, normal = self.collision_system.check_bullet_wall_collision(bullet)
             if hit_wall and not self.projectile_system.bounce_bullet(
-                bullet, normal[0], normal[1]
+                bullet,
+                normal[0],
+                normal[1],
             ):
                 bullet.destroy()
             elif hit_wall:
@@ -215,7 +241,21 @@ class Game:
                 self.state.tanks,
             )
             if hit_tank:
-                hit_tank.take_damage(bullet.damage)
+                # Find shooter tank for stats
+                shooter_tank = next(
+                    (t for t in self.state.tanks if t.id == bullet.owner_id),
+                    None,
+                )
+
+                # Record hit and damage
+                if shooter_tank:
+                    self.stats_tracker.record_hit(shooter_tank, hit_tank, bullet.damage)
+
+                # Apply damage and check for kill
+                was_destroyed = hit_tank.take_damage(bullet.damage)
+                if was_destroyed and shooter_tank:
+                    self.stats_tracker.record_kill(shooter_tank, hit_tank)
+
                 bullet.destroy()
                 if self.sound_manager:
                     self.sound_manager.play_hit()
@@ -262,7 +302,8 @@ class Game:
 
             # Update radar (not blocked by walls)
             tank.radar_detections = self.radar_system.detect_entities(
-                tank, all_entities
+                tank,
+                all_entities,
             )
 
             # Check for new radar detections (trigger sound)
@@ -332,7 +373,7 @@ class Game:
                             entity.x,
                             entity.y,
                             entity_type,
-                        )
+                        ),
                     )
 
         # Remove old blips (faded out)
@@ -363,6 +404,9 @@ class Game:
 
         """
         if tank.shoot():
+            # Record shot fired
+            self.stats_tracker.record_shot(tank)
+
             tip_x, tip_y = tank.get_turret_tip_position()
 
             angle_rad = math.radians(tank.turret_angle)
@@ -383,6 +427,10 @@ class Game:
             return bullet
         return None
 
+    def display_final_stats(self) -> None:
+        """Display final match statistics summary."""
+        self.stats_tracker.print_summary()
+
     def _handle_keydown(self, key: int) -> None:
         """Handle global key presses.
 
@@ -402,5 +450,80 @@ class Game:
             self.settings.show_radar_blips = not self.settings.show_radar_blips
         elif key == pygame.K_F5:
             self.settings.show_minimap = not self.settings.show_minimap
+        elif key == pygame.K_F6:
+            self.settings.show_stats = not self.settings.show_stats
         elif key == pygame.K_p:
             self.settings.paused = not self.settings.paused
+        elif key == pygame.K_c:
+            # Cycle camera modes
+            self._cycle_camera_mode()
+        elif key == pygame.K_TAB:
+            # Cycle follow target
+            self._cycle_follow_target()
+        elif key == pygame.K_EQUALS or key == pygame.K_PLUS:
+            # Zoom in (FREE mode)
+            self.camera.adjust_zoom(0.1)
+        elif key == pygame.K_MINUS:
+            # Zoom out (FREE mode)
+            self.camera.adjust_zoom(-0.1)
+
+    def _cycle_camera_mode(self) -> None:
+        """Cycle through camera modes."""
+        if self.camera.mode == CameraMode.GLOBAL:
+            self.camera.set_mode(CameraMode.FOLLOW)
+            # Set follow target to first active tank if available
+            if self.state.tanks:
+                active_tanks = [t for t in self.state.tanks if t.active]
+                if active_tanks:
+                    self.camera.set_follow_target(active_tanks[0])
+        elif self.camera.mode == CameraMode.FOLLOW:
+            self.camera.set_mode(CameraMode.FREE)
+            self.camera.set_follow_target(None)
+        else:  # FREE
+            self.camera.set_mode(CameraMode.GLOBAL)
+            self.camera.set_follow_target(None)
+
+    def _cycle_follow_target(self) -> None:
+        """Cycle to next active tank as follow target."""
+        if self.camera.mode != CameraMode.FOLLOW:
+            return
+
+        active_tanks = [t for t in self.state.tanks if t.active]
+        if not active_tanks:
+            return
+
+        current_target = self.camera.follow_target
+        if current_target not in active_tanks:
+            self.camera.set_follow_target(active_tanks[0])
+        else:
+            current_index = active_tanks.index(current_target)
+            next_index = (current_index + 1) % len(active_tanks)
+            self.camera.set_follow_target(active_tanks[next_index])
+
+    def _handle_camera_pan(self, dt: float) -> None:
+        """Handle camera panning with arrow keys in FREE mode.
+
+        Args:
+            dt: Delta time in seconds.
+
+        """
+        if self.camera.mode != CameraMode.FREE:
+            return
+
+        keys = pygame.key.get_pressed()
+        pan_speed = 300  # pixels per second
+
+        dx = 0
+        dy = 0
+
+        if keys[pygame.K_LEFT]:
+            dx -= pan_speed * dt
+        if keys[pygame.K_RIGHT]:
+            dx += pan_speed * dt
+        if keys[pygame.K_UP]:
+            dy -= pan_speed * dt
+        if keys[pygame.K_DOWN]:
+            dy += pan_speed * dt
+
+        if dx != 0 or dy != 0:
+            self.camera.pan(dx, dy)

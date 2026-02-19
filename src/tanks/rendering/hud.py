@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 if TYPE_CHECKING:
+    from tanks.core.stats import StatsTracker
     from tanks.entities.tank import Tank
 
 
@@ -59,3 +60,59 @@ class HudRenderer:
 
         text_surface = self._small_font.render(status_text, True, color)
         self._screen.blit(text_surface, (10, y_offset))
+
+    def render_stats_overlay(
+        self,
+        stats_tracker: "StatsTracker",
+        tanks: list["Tank"],
+    ) -> None:
+        """Render live performance stats overlay.
+
+        Args:
+            stats_tracker: Stats tracker with current match stats.
+            tanks: List of active tanks to show stats for.
+
+        """
+        if not tanks:
+            return
+
+        # Position on right side of screen
+        x = self._screen.get_width() - 300
+        y = 10
+        line_height = 20
+
+        # Title
+        title_text = self._small_font.render("MATCH STATS", True, (255, 255, 100))
+        self._screen.blit(title_text, (x, y))
+        y += line_height + 5
+
+        # Stats for each tank
+        for tank in tanks:
+            stats = stats_tracker.get_stats(tank.id)
+            if not stats:
+                continue
+
+            # Tank header
+            tank_label = f"Tank {tank.id} (Team {tank.team})"
+            color = (100, 255, 100) if tank.active else (150, 150, 150)
+            header_text = self._small_font.render(tank_label, True, color)
+            self._screen.blit(header_text, (x, y))
+            y += line_height
+
+            # K/D ratio
+            kd_text = f"  K/D: {stats.kills}/{stats.deaths} ({stats.kd_ratio():.2f})"
+            text_surface = self._small_font.render(kd_text, True, (200, 200, 200))
+            self._screen.blit(text_surface, (x, y))
+            y += line_height
+
+            # Accuracy
+            acc_text = f"  Acc: {stats.accuracy():.1f}% ({stats.shots_hit}/{stats.shots_fired})"
+            text_surface = self._small_font.render(acc_text, True, (200, 200, 200))
+            self._screen.blit(text_surface, (x, y))
+            y += line_height
+
+            # Damage
+            dmg_text = f"  Dmg: {stats.damage_dealt:.0f}D / {stats.damage_taken:.0f}T"
+            text_surface = self._small_font.render(dmg_text, True, (200, 200, 200))
+            self._screen.blit(text_surface, (x, y))
+            y += line_height + 5
